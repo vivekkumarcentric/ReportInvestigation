@@ -1,0 +1,444 @@
+package bug_investigation_agent.service;
+
+import bug_investigation_agent.client.OllamaClient;
+import bug_investigation_agent.model.FailureFeedback;
+import bug_investigation_agent.model.request.InvestigationRequest;
+import bug_investigation_agent.model.response.InvestigationResponse;
+import bug_investigation_agent.prompt.InvestigationPromptBuilder;
+import bug_investigation_agent.util.FailureIdGenerator;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class InvestigationService {
+    private static final Logger log = LoggerFactory.getLogger(InvestigationService.class);
+
+    private final OllamaClient ollamaClient;
+    private final InvestigationPromptBuilder promptBuilder;
+    private final ObjectMapper objectMapper;
+    private final FailureFeedbackService failureFeedbackService;
+
+    public InvestigationService(OllamaClient ollamaClient,
+                                InvestigationPromptBuilder promptBuilder,
+                                ObjectMapper objectMapper,
+                                FailureFeedbackService failureFeedbackService) {
+        this.ollamaClient = ollamaClient;
+        this.promptBuilder = promptBuilder;
+        this.objectMapper = objectMapper;
+        this.failureFeedbackService = failureFeedbackService;
+    }
+
+    public InvestigationResponse investigate(InvestigationRequest request) {
+        return investigateWithMetrics(request, deriveScenarioId(request)).response();
+    }
+
+    /**
+     * Identical behavior to {@link #investigate(InvestigationRequest)} (same prompt, same
+     * OllamaClient call, same JSON repair/parsing/retry logic, same classification output) but
+     * additionally measures and logs performance metrics for every Ollama request attempt
+     * (including retries), and returns those metrics alongside the result so callers that process
+     * many failures (e.g. report analysis) can aggregate report-level totals.
+     *
+     * <p>Before calling Ollama, this checks whether a human has already classified this exact
+     * failure (matched by the same stable {@code failureId} used elsewhere for feedback). If so,
+     * the historical human classification is returned directly - with {@code source = HISTORICAL}
+     * and zero Ollama calls - since re-asking the AI to reclassify a failure a human has already
+     * corrected would waste time and could disagree with the human's decision.</p>
+     *
+     * <p>If no exact match exists, a secondary cross-report similarity check
+     * ({@link FailureFeedbackService#findHistoricalMatch(InvestigationRequest)}) looks for the
+     * SAME underlying logical failure re-appearing under a DIFFERENT {@code failureId} (e.g. in a
+     * different report run) and reuses that human classification too, under the same conditions
+     * (single, non-conflicting match only).</p>
+     */
+    public InvestigationOutcome investigateWithMetrics(InvestigationRequest request, String scenarioId) {
+        String failureId = FailureIdGenerator.generate(
+                request == null ? null : request.getScenario(),
+                request == null ? null : request.getFeature(),
+                request == null ? null : request.getFailedStep(),
+                request == null ? null : request.getError());
+
+        Optional<bug_investigation_agent.model.response.FailureClassificationResponse> historical =
+                failureFeedbackService.getClassification(failureId);
+        if (historical.isPresent()) {
+            String humanClassification = historical.get().getHumanClassification();
+            if (humanClassification != null && !humanClassification.isBlank()) {
+                log.info("Historical human classification found for failureId={} (scenario={}); skipping Ollama.",
+                        failureId, scenarioId);
+                return buildHistoricalOutcome(failureId, historical.get());
+            }
+        }
+
+        Optional<bug_investigation_agent.model.response.FailureClassificationResponse> crossReportMatch =
+                failureFeedbackService.findHistoricalMatch(request);
+        if (crossReportMatch.isPresent()) {
+            log.info(
+                    "Cross-report historical similarity match found for failureId={} (scenario={}); skipping Ollama.",
+                    failureId, scenarioId);
+            return buildHistoricalOutcome(failureId, crossReportMatch.get());
+        }
+
+        long promptBuildStart = System.nanoTime();
+        String prompt = promptBuilder.buildPrompt(request);
+        long promptBuildMillis = (System.nanoTime() - promptBuildStart) / 1_000_000;
+
+        String image = request == null ? null : request.getFailureImage();
+        int promptChars = prompt == null ? 0 : prompt.length();
+
+        List<OllamaCallMetrics> callMetrics = new ArrayList<>();
+        Exception lastError = null;
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            boolean isRetry = attempt > 1;
+            OllamaClient.OllamaGenerationResult generation;
+            try {
+                generation = ollamaClient.generateWithMetrics(prompt, image);
+            } catch (Exception e) {
+                OllamaCallMetrics failedCallMetrics = new OllamaCallMetrics(
+                        scenarioId, null, image != null && !image.isBlank(), isRetry,
+                        promptChars, promptBuildMillis, 0, 0, promptBuildMillis, null, null);
+                logOllamaMetrics(failedCallMetrics);
+                throw new RuntimeException(
+                        "Ollama AI Service Unavailable: " + e.getMessage() +
+                        " Please ensure Ollama is running and required models are loaded.", e);
+            }
+
+            long parseStart = System.nanoTime();
+            try {
+                String json = normalizeResponse(repairJson(extractJson(generation.response())));
+                InvestigationResponse parsed = objectMapper.readValue(json, InvestigationResponse.class);
+                correctHallucinatedScreenshotText(parsed, image);
+                applyHumanFeedback(failureId, request, parsed);
+
+                long parseMillis = (System.nanoTime() - parseStart) / 1_000_000;
+                long totalMillis = promptBuildMillis + generation.httpDurationMillis() + parseMillis;
+                OllamaCallMetrics metrics = new OllamaCallMetrics(
+                        scenarioId, generation.model(), generation.vision(), isRetry,
+                        promptChars, promptBuildMillis, generation.httpDurationMillis(), parseMillis,
+                        totalMillis, generation.promptEvalCount(), generation.evalCount());
+                callMetrics.add(metrics);
+                logOllamaMetrics(metrics);
+
+                return new InvestigationOutcome(parsed, callMetrics);
+            } catch (Exception e) {
+                long parseMillis = (System.nanoTime() - parseStart) / 1_000_000;
+                long totalMillis = promptBuildMillis + generation.httpDurationMillis() + parseMillis;
+                OllamaCallMetrics metrics = new OllamaCallMetrics(
+                        scenarioId, generation.model(), generation.vision(), isRetry,
+                        promptChars, promptBuildMillis, generation.httpDurationMillis(), parseMillis,
+                        totalMillis, generation.promptEvalCount(), generation.evalCount());
+                callMetrics.add(metrics);
+                logOllamaMetrics(metrics);
+                lastError = e;
+                // retry once - Ollama occasionally truncates/garbles JSON on long prompts
+            }
+        }
+
+        throw new RuntimeException(
+                "Failed to parse AI investigation response. Ollama did not return a valid investigation response.",
+                lastError);
+    }
+
+    /**
+     * Builds an {@link InvestigationOutcome} directly from a previously-saved human classification,
+     * with an empty {@code callMetrics} list since Ollama was never invoked. Only the
+     * classification/source fields are populated with confidence from the historical record; the
+     * remaining analysis fields (evidence, steps to reproduce, etc.) are not available from a
+     * classification-only history record and are left as sensible defaults.
+     */
+    private InvestigationOutcome buildHistoricalOutcome(
+            String failureId,
+            bug_investigation_agent.model.response.FailureClassificationResponse historical) {
+        InvestigationResponse response = new InvestigationResponse();
+        response.setFailureId(failureId);
+        response.setAiClassification(historical.getAiClassification());
+        response.setHumanClassification(historical.getHumanClassification());
+        response.setClassification(historical.getHumanClassification());
+        response.setSource(FailureFeedbackService.SOURCE_HISTORICAL);
+        response.setConfidence(100);
+        response.setRootCauseType("CONFIRMED");
+        response.setRootCause(
+                "Classification based on a previously confirmed human correction for this exact failure. "
+                + "Ollama was not called for this result.");
+        return new InvestigationOutcome(response, new ArrayList<>());
+    }
+
+
+    private String deriveScenarioId(InvestigationRequest request) {
+        if (request == null) {
+            return "unknown";
+        }
+        if (request.getScenario() != null && !request.getScenario().isBlank()) {
+            return request.getScenario();
+        }
+        if (request.getTestName() != null && !request.getTestName().isBlank()) {
+            return request.getTestName();
+        }
+        return "unknown";
+    }
+
+    /**
+     * Computes a stable {@code failureId} for this request, persists the AI's classification as
+     * the baseline for that failure (never overwriting any existing human correction), and then
+     * overlays any existing human correction onto the response so the caller/UI immediately sees
+     * the correct effective classification/source - even the very first time this failure is
+     * re-investigated after a human previously corrected it.
+     *
+     * <p>{@code failureId} is passed in (already computed once at the top of
+     * {@link #investigateWithMetrics(InvestigationRequest, String)}) rather than recomputed here,
+     * since the historical-lookup short-circuit needs the same id before Ollama is even called.</p>
+     */
+    private void applyHumanFeedback(String failureId, InvestigationRequest request, InvestigationResponse response) {
+        if (response == null) {
+            return;
+        }
+
+        response.setFailureId(failureId);
+        response.setAiClassification(response.getClassification());
+        response.setHumanClassification(null);
+        response.setSource(FailureFeedbackService.SOURCE_AI);
+
+        failureFeedbackService.recordAiResult(failureId, request, response);
+
+        Optional<bug_investigation_agent.model.response.FailureClassificationResponse> existing =
+                failureFeedbackService.getClassification(failureId);
+        existing.ifPresent(feedback -> {
+            if (feedback.getHumanClassification() != null && !feedback.getHumanClassification().isBlank()) {
+                response.setHumanClassification(feedback.getHumanClassification());
+                response.setSource(FailureFeedbackService.SOURCE_HUMAN_CORRECTED);
+                response.setClassification(feedback.getHumanClassification());
+            }
+        });
+    }
+
+    private void logOllamaMetrics(OllamaCallMetrics m) {
+        log.info(
+                "\n## OLLAMA METRICS\n" +
+                "Scenario: {}\n" +
+                "Model: {}\n" +
+                "Vision: {}\n" +
+                "Prompt chars: {}\n" +
+                "Prompt build time: {} ms\n" +
+                "HTTP duration: {} ms\n" +
+                "Parse time: {} ms\n" +
+                "Total duration: {} ms\n" +
+                "Prompt tokens: {}\n" +
+                "Output tokens: {}\n" +
+                "Retry: {}\n",
+                m.scenarioId(), m.model(), m.vision(), m.promptChars(), m.promptBuildMillis(),
+                m.httpMillis(), m.parseMillis(), m.totalMillis(), m.promptTokens(), m.outputTokens(),
+                m.retry());
+    }
+
+    /** Per-Ollama-request performance metrics (one entry per attempt, including retries). */
+    public record OllamaCallMetrics(
+            String scenarioId,
+            String model,
+            boolean vision,
+            boolean retry,
+            int promptChars,
+            long promptBuildMillis,
+            long httpMillis,
+            long parseMillis,
+            long totalMillis,
+            Integer promptTokens,
+            Integer outputTokens
+    ) {
+    }
+
+    /** Result of {@link #investigateWithMetrics(InvestigationRequest, String)}: the parsed
+     *  investigation response plus the metrics for every Ollama attempt made while producing it. */
+    public record InvestigationOutcome(
+            InvestigationResponse response,
+            List<OllamaCallMetrics> callMetrics
+    ) {
+    }
+
+
+    /**
+     * The vision model occasionally ignores the attached image and hallucinates that no
+     * screenshot was provided, even though one was sent. When we know for certain an image was
+     * attached to this request, replace any such hallucinated text with an honest note instead of
+     * showing a misleading "no screenshot" message in the UI.
+     */
+    private void correctHallucinatedScreenshotText(InvestigationResponse response, String image) {
+        boolean imageWasSent = image != null && !image.isBlank();
+        if (!imageWasSent || response == null) {
+            return;
+        }
+        String observation = response.getScreenshotObservation();
+        if (observation != null && observation.toLowerCase().contains("no screenshot")
+                || (observation != null && observation.toLowerCase().contains("not provided"))) {
+            response.setScreenshotObservation(
+                    "A screenshot was attached but the AI vision model did not clearly describe it. "
+                    + "Please review the screenshot manually alongside this analysis.");
+        }
+    }
+
+    private String extractJson(String response) {
+        if (response == null || response.isBlank()) {
+            throw new IllegalArgumentException("Ollama returned an empty response");
+        }
+        String cleaned = response.trim()
+                .replace("```json", "")
+                .replace("```JSON", "")
+                .replace("```", "")
+                .trim();
+
+        int start = cleaned.indexOf('{');
+        if (start < 0) throw new IllegalArgumentException("No JSON object found in Ollama response");
+
+        int end = cleaned.lastIndexOf('}');
+        if (end > start) return cleaned.substring(start, end + 1);
+
+        // No closing brace found at all (fully truncated) - return from first '{' to end,
+        // repairJson() will attempt to close it.
+        return cleaned.substring(start);
+    }
+
+    /**
+     * Attempts to salvage a truncated/malformed JSON object returned by the LLM.
+     * Scans the text tracking whether we're inside a string (respecting escapes) and the
+     * current depth of open braces/brackets, then closes any dangling string and appends
+     * the missing closing brackets so the result can be parsed, even if some trailing
+     * content is lost. If the input already parses as-is, returns it unchanged.
+     */
+    private String repairJson(String json) {
+        try {
+            objectMapper.readTree(json);
+            return json; // already valid
+        } catch (Exception ignored) {
+            // fall through to repair
+        }
+
+        StringBuilder result = new StringBuilder(json.length() + 16);
+        java.util.Deque<Character> stack = new java.util.ArrayDeque<>();
+        boolean inString = false;
+        boolean escape = false;
+
+        for (int i = 0; i < json.length(); i++) {
+            char c = json.charAt(i);
+            result.append(c);
+
+            if (escape) {
+                escape = false;
+                continue;
+            }
+            if (c == '\\' && inString) {
+                escape = true;
+                continue;
+            }
+            if (c == '"') {
+                inString = !inString;
+                continue;
+            }
+            if (inString) continue;
+
+            if (c == '{' || c == '[') {
+                stack.push(c);
+            } else if (c == '}' || c == ']') {
+                if (!stack.isEmpty()) stack.pop();
+            }
+        }
+
+        // If we ended mid-string, remove any trailing dangling partial token/comma and close the string.
+        if (inString) {
+            // Trim a trailing partial escape backslash if any.
+            if (result.length() > 0 && result.charAt(result.length() - 1) == '\\') {
+                result.setLength(result.length() - 1);
+            }
+            result.append('"');
+        }
+
+        // Drop a trailing dangling comma before we close remaining structures.
+        int lastNonSpace = result.length() - 1;
+        while (lastNonSpace >= 0 && Character.isWhitespace(result.charAt(lastNonSpace))) lastNonSpace--;
+        if (lastNonSpace >= 0 && result.charAt(lastNonSpace) == ',') {
+            result.setLength(lastNonSpace);
+        }
+
+        while (!stack.isEmpty()) {
+            char open = stack.pop();
+            result.append(open == '{' ? '}' : ']');
+        }
+
+        return result.toString();
+    }
+
+    private String normalizeResponse(String json) throws Exception {
+        JsonNode root = objectMapper.readTree(json);
+        if (!root.isObject()) throw new IllegalArgumentException("AI response is not a JSON object");
+
+        ObjectNode object = (ObjectNode) root;
+        normalizeString(object, "classification");
+        normalizeString(object, "rootCauseType");
+        normalizeString(object, "rootCause");
+        normalizeString(object, "severity");
+        normalizeString(object, "recommendedAction");
+        normalizeString(object, "suggestedFix");
+        normalizeString(object, "similarPatterns");
+        normalizeString(object, "screenshotObservation");
+        normalizeArray(object, "evidence");
+        normalizeArray(object, "missingEvidence");
+        normalizeArray(object, "stepsToReproduce");
+        normalizeArray(object, "preventionTips");
+
+        if (!object.has("confidence") || !object.get("confidence").canConvertToInt()) {
+            object.put("confidence", 0);
+        }
+        return objectMapper.writeValueAsString(object);
+    }
+
+    private void normalizeString(ObjectNode object, String field) {
+        JsonNode node = object.get(field);
+        if (node == null || node.isNull()) {
+            object.put(field, "");
+        } else if (!node.isTextual()) {
+            object.put(field, convertNodeToText(node));
+        }
+    }
+
+    private void normalizeArray(ObjectNode object, String field) {
+        JsonNode node = object.get(field);
+        if (node == null || node.isNull()) {
+            object.putArray(field);
+            return;
+        }
+        if (!node.isArray()) {
+            ArrayNode array = object.putArray(field);
+            array.add(convertNodeToText(node));
+            return;
+        }
+        ArrayNode array = (ArrayNode) node;
+        for (int i = 0; i < array.size(); i++) {
+            if (!array.get(i).isTextual()) {
+                array.set(i, objectMapper.getNodeFactory().textNode(convertNodeToText(array.get(i))));
+            }
+        }
+    }
+
+    private String convertNodeToText(JsonNode node) {
+        if (node == null || node.isNull()) return "";
+        if (node.isTextual()) return node.asText();
+        if (node.isArray()) {
+            StringBuilder value = new StringBuilder();
+            for (JsonNode item : node) {
+                if (!value.isEmpty()) value.append("; ");
+                value.append(convertNodeToText(item));
+            }
+            return value.toString();
+        }
+        if (node.isObject() && node.has("message")) {
+            return node.get("message").asText();
+        }
+        return node.toString();
+    }
+}

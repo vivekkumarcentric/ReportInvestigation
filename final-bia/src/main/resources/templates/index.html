@@ -1,0 +1,3772 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Report Failure Analysis</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Google Fonts -->
+  <link
+          href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap"
+          rel="stylesheet">
+  <!-- DataTables CSS -->
+  <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/fixedheader/3.4.0/css/fixedHeader.bootstrap5.min.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    body {
+        padding: 20px;
+        /* Reduced from 30px */
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        color: #1e293b;
+        font-family: 'Outfit', sans-serif;
+        min-height: 100vh;
+    }
+
+    .container-fluid {
+        max-width: 1400px;
+    }
+
+    h2 {
+        font-weight: 700;
+        color: #0f172a;
+        letter-spacing: -0.02em;
+    }
+
+    .upload-area {
+        border: 2px dashed #cbd5e1;
+        border-radius: 16px;
+        padding: 30px 40px;
+        /* Reduced vertical padding */
+        text-align: center;
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(10px);
+        margin-bottom: 20px;
+        /* Reduced margin */
+        cursor: pointer;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        position: relative;
+        min-height: 280px;
+        /* Reduced min-height */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .step-container {
+        width: 100%;
+    }
+
+    .step-hidden {
+        display: none;
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    .step-visible {
+        display: block;
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .action-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 24px;
+        text-align: center;
+        cursor: pointer;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .action-icon {
+        font-size: 2rem;
+        margin-bottom: 15px;
+        color: #3b82f6;
+    }
+
+    .back-btn {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        font-size: 0.9rem;
+        color: #64748b;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+    }
+
+    .failure-img {
+        max-width: 150px;
+        max-height: 100px;
+        cursor: pointer;
+        border: 2px solid #f1f5f9;
+        border-radius: 8px;
+        object-fit: cover;
+    }
+
+    #analysisTable {
+        table-layout: fixed;
+        width: 100% !important;
+    }
+
+    .error-msg {
+        max-height: 250px;
+        min-height: 60px;
+        width: 100%;
+        max-width: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+        resize: vertical;
+        /* Changed to vertical to prevent horizontal column overlap */
+        font-size: 0.8rem;
+        font-family: 'Inter', monospace;
+        white-space: pre-wrap;
+        word-break: break-all;
+        background: #fff1f2;
+        /* Light rose for failures */
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid #fecaca;
+        color: #991b1b;
+        line-height: 1.5;
+        box-sizing: border-box;
+        /* Ensure padding doesn't add to width */
+    }
+
+    .step-line {
+        font-weight: 500;
+        color: #e11d48;
+        /* More vibrant rose/red */
+        white-space: normal;
+        word-wrap: break-word;
+        word-break: break-word;
+        display: block;
+        width: 100%;
+    }
+
+    .scenario-pill {
+        display: inline-block;
+        padding: 4px 12px;
+        background-color: #eef2ff;
+        color: #4338ca;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        border: 1px solid #e0e7ff;
+        max-width: 100%;
+        word-wrap: break-word;
+        white-space: normal;
+    }
+
+    .feature-pill {
+        display: inline-block;
+        padding: 3px 10px;
+        background-color: #fdf4ff;
+        color: #7e22ce;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.8rem;
+        border: 1px solid #e9d5ff;
+        max-width: 100%;
+        word-wrap: break-word;
+        white-space: normal;
+    }
+
+    #summaryTable_wrapper,
+    #featureTable_wrapper,
+    #analysisTable_wrapper {
+        background: white;
+        padding: 24px;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.05);
+        border: 1px solid #f1f5f9;
+    }
+
+    #summaryTable_wrapper {
+        border-top: 4px solid #6366f1;
+        /* Indigo accent */
+    }
+
+    #featureTable_wrapper {
+        border-top: 4px solid #8b5cf6;
+        /* Violet accent */
+    }
+
+    #analysisTable_wrapper {
+        border-top: 4px solid #3b82f6;
+        /* Blue accent */
+    }
+
+    .table {
+        border-collapse: separate;
+        border-spacing: 0 8px;
+        margin-top: -8px !important;
+    }
+
+    #summaryTable thead th {
+        background-color: #f5f3ff;
+        /* Light indigo */
+        color: #4338ca;
+    }
+
+    #featureTable thead th {
+        background-color: #f5f3ff;
+        color: #6d28d9;
+    }
+
+    #analysisTable thead th {
+        background-color: #eff6ff;
+        /* Light blue */
+        color: #1d4ed8;
+    }
+
+    .table thead th {
+        border: none;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        padding: 14px 16px;
+    }
+
+    .table tbody tr {
+        background-color: #fff;
+    }
+
+    .table tbody tr td {
+        border-top: 1px solid #f1f5f9;
+        border-bottom: 1px solid #f1f5f9;
+        padding: 12px 16px;
+        overflow: hidden;
+        /* Prevent any potential bleed over */
+        vertical-align: top;
+    }
+
+    .table tbody tr td:first-child {
+        border-left: 1px solid #f1f5f9;
+        border-top-left-radius: 12px;
+        border-bottom-left-radius: 12px;
+    }
+
+    .table tbody tr td:last-child {
+        border-right: 1px solid #f1f5f9;
+        border-top-right-radius: 12px;
+        border-bottom-right-radius: 12px;
+    }
+
+    h4 {
+        margin-top: 40px;
+        margin-bottom: 24px;
+        color: #1e293b;
+        padding-left: 0;
+        font-weight: 700;
+        font-size: 1.25rem;
+        display: flex;
+        align-items: center;
+    }
+
+    .h4-accent {
+        width: 4px;
+        height: 24px;
+        border-radius: 4px;
+        margin-right: 12px;
+    }
+
+    .bg-indigo {
+        background-color: #6366f1;
+    }
+
+    .bg-blue {
+        background-color: #3b82f6;
+    }
+
+    /* Modal styling */
+    .modal-img {
+        max-width: 100%;
+        max-height: 80vh;
+        object-fit: contain;
+        border-radius: 12px;
+    }
+
+    .modal-content {
+        border: none;
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+
+    .modal-header {
+        border-bottom: 1px solid #f1f5f9;
+        background-color: #fff;
+        padding: 20px 24px;
+    }
+
+    thead input {
+        width: 100%;
+        padding: 8px 12px;
+        box-sizing: border-box;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 0.8rem;
+    }
+
+    thead input:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    /* Buttons styling */
+    .dt-buttons .btn {
+        margin-right: 8px;
+        border-radius: 10px;
+        font-weight: 500;
+        padding: 8px 16px;
+    }
+
+    .btn-primary {
+        background-color: #3b82f6;
+        border: none;
+    }
+
+    .btn-success {
+        background-color: #10b981;
+        border: none;
+    }
+
+    #summaryTable thead th:last-child,
+    #summaryTable tbody td:last-child {
+        text-align: right;
+        padding-right: 24px;
+    }
+
+    #featureTable thead th:last-child,
+    #featureTable tbody td:last-child {
+        text-align: right;
+        padding-right: 24px;
+    }
+
+    #analysisCount {
+        font-size: 0.8rem;
+        padding: 6px 12px;
+        background-color: #3b82f6 !important;
+        box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.2);
+    }
+
+    /* Fix: Single grey summary box - hide duplicate DataTables info elements */
+    #summaryTable_wrapper .dataTables_info,
+    #summaryTable_wrapper .dataTables_length {
+        display: none;
+    }
+
+    /* Group buttons and search into a single grey box */
+    .summary-controls {
+        background: #f8fafc;
+        padding: 16px;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+    }
+
+    /* Ensure controls are always visible */
+    .summary-controls .dt-buttons,
+    .summary-controls .dataTables_filter {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        margin: 0 !important;
+    }
+
+    .summary-controls .dt-buttons .btn {
+        margin-right: 8px;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+
+    .compare-selection-container {
+        width: 100%;
+        max-width: 900px;
+        margin-top: 0.5rem;
+        /* Reduced top margin */
+    }
+
+    .report-selection-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        /* Slightly smaller radius */
+        padding: 24px;
+        /* Reduced padding */
+        height: 100%;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        /* Tighter gap */
+        position: relative;
+        box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.05);
+    }
+
+    .report-selection-card:hover {
+        border-color: #3b82f6;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+
+    .step-indicator {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #3b82f6;
+        margin-bottom: 4px;
+        display: block;
+    }
+
+    .file-select-btn {
+        background: #f8fafc;
+        border: 2px dashed #cbd5e1;
+        border-radius: 10px;
+        padding: 16px 12px;
+        /* Reduced padding */
+        width: 100%;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        /* Tighter gap */
+    }
+
+    .file-select-btn:hover {
+        background: #eff6ff;
+        border-color: #3b82f6;
+    }
+
+    .file-select-btn.file-ready {
+        background: #f0fdf4;
+        border: 2px solid #22c55e;
+        border-style: solid;
+    }
+
+    .file-select-btn .icon {
+        font-size: 2rem;
+        color: #64748b;
+    }
+
+    .file-select-btn.file-ready .icon {
+        color: #22c55e;
+    }
+
+    .file-select-btn .file-name {
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 1rem;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .file-select-btn .file-status {
+        font-size: 0.85rem;
+        color: #64748b;
+    }
+
+    .helper-text {
+        font-size: 0.875rem;
+        color: #64748b;
+        line-height: 1.5;
+    }
+
+    #executeCompareBtn {
+        border-radius: 10px;
+        padding: 12px 40px;
+        /* Slightly more compact */
+        font-weight: 600;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        margin-top: 0.5rem;
+        /* Reduced margin */
+        background-color: #3b82f6;
+        border: none;
+        box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.2);
+        color: white;
+    }
+
+    #executeCompareBtn:disabled {
+        background-color: #e2e8f0;
+        color: #94a3b8;
+        cursor: not-allowed;
+        box-shadow: none;
+    }
+
+    /* Comparison Table Professional Styling */
+    #comparisonTable thead.table-dark {
+        background-color: #1e293b !important;
+    }
+
+    #comparisonTable.table-bordered {
+        border: 1px solid #e2e8f0;
+    }
+
+    #comparisonTable thead th {
+        color: #334155;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        padding: 16px;
+        vertical-align: middle;
+        border: none;
+    }
+
+    /* Clearer Subtle Header Styling */
+    .header-main-row th {
+        background-color: #f0f7ff !important;
+        /* Clearly visible soft blue */
+        border-top: 1px solid #e2e8f0 !important;
+        border-bottom: 3px solid #bfdbfe !important;
+        color: #1e3a8a !important;
+        /* Deep professional blue */
+        font-weight: 700 !important;
+        letter-spacing: 0.04em !important;
+        text-transform: uppercase;
+    }
+
+    .header-report-1 {
+        border-top: 4px solid #3b82f6 !important;
+        background-color: #e0f2fe !important;
+        /* Clearly distinct light blue */
+        color: #0369a1 !important;
+    }
+
+    .header-report-2 {
+        border-top: 4px solid #06b6d4 !important;
+        background-color: #e0faff !important;
+        /* Clearly distinct light cyan */
+        color: #0891b2 !important;
+    }
+
+    /* Filter Row Distinction */
+    .filter-row th {
+        background-color: #ffffff !important;
+        padding: 10px 16px !important;
+        border-bottom: 2px solid #f1f5f9 !important;
+    }
+
+    .status-badge-compare {
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.75rem;
+        display: inline-block;
+        min-width: 90px;
+    }
+
+    .status-pass {
+        background-color: #ecfdf5;
+        color: #059669;
+        border: 1px solid #a7f3d0;
+    }
+
+    .status-fail {
+        background-color: #fef2f2;
+        color: #dc2626;
+        border: 1px solid #fecaca;
+    }
+
+    .status-not-present {
+        background-color: #f9fafb;
+        color: #6b7280;
+        border: 1px solid #e5e7eb;
+    }
+
+    .compare-id-cell {
+        color: #6366f1;
+        font-weight: 600;
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* Comparison Summary Styles */
+    #comparisonStatTable thead th {
+        background-color: #f8fafc;
+        color: #64748b;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.7rem;
+        letter-spacing: 0.05em;
+    }
+
+    .bg-success-subtle {
+        background-color: #ecfdf5 !important;
+    }
+
+    .bg-danger-subtle {
+        background-color: #fef2f2 !important;
+    }
+
+    .letter-spacing-05 {
+        letter-spacing: 0.05em;
+    }
+
+    #statusChangedFailLink {
+        display: inline-block;
+    }
+
+    #statusChangedFailLink:active {
+        color: #b91c1c;
+    }
+
+    .allure-pre {
+        max-height: 240px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 8px;
+        font-family: 'Inter', monospace;
+        font-size: 0.75rem;
+        margin: 0;
+    }
+
+    .allure-row-clickable {
+        cursor: pointer;
+    }
+
+    .allure-row-clickable:hover td {
+        background: #f8fafc;
+    }
+
+    /* Analyze Button Styles */
+    .analyze-btn {
+        font-size: 0.875rem;
+        padding: 0.375rem 0.75rem;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+    }
+
+    .analyze-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);
+    }
+
+    .analyze-btn:active {
+        transform: translateY(0);
+    }
+
+    .analyze-btn:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container-fluid">
+  <div class="row mb-2 align-items-center">
+    <div class="col">
+      <h2 class="mb-1"><span style="color: #3b82f6;">FE/BE Automation Report-</span> Failure Analyzer</h2>
+      <p class="text-muted small mb-0">Upload your HTML report file to generate a failure analysis matrix.</p>
+    </div>
+  </div>
+
+  <div class="upload-area" id="drop-area">
+    <div id="step1" class="step-container step-visible">
+      <h5 class="mb-3">Drag & Drop HTML Report Here</h5>
+      <p class="text-muted">or</p>
+      <div class="dropdown">
+        <button class="btn btn-primary btn-lg dropdown-toggle px-4 shadow-sm" type="button"
+                id="reportTypeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+          Select File
+        </button>
+        <ul class="dropdown-menu shadow-sm border-0" aria-labelledby="reportTypeDropdown">
+          <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectType('EXTENT')">Extent
+            Report</a></li>
+          <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectType('SPARK')">Spark
+            Extent
+            Report</a></li>
+          <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectType('ALLURE_API')">Allure
+            API Report</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="step2" class="step-container step-hidden">
+      <a href="javascript:void(0)" class="back-btn" onclick="showStep(1)">
+        <i class="fas fa-arrow-left me-2"></i> Back
+      </a>
+      <h5 class="mb-3">Select Action for <span id="selectedReportType" class="text-primary"></span></h5>
+      <div class="row justify-content-center g-4 w-100">
+        <div class="col-md-5">
+          <div class="action-card" onclick="startAction('analysis')">
+            <div class="action-icon"><i class="fas fa-search"></i></div>
+            <h6 class="fw-bold">Failure Analysis</h6>
+            <p class="small text-muted mb-0">Analyze failures using failed step lines and metrics.</p>
+          </div>
+        </div>
+        <div class="col-md-5">
+          <div class="action-card" onclick="startAction('compare')">
+            <div class="action-icon"><i class="fas fa-columns"></i></div>
+            <h6 class="fw-bold">Compare Reports</h6>
+            <p class="small text-muted mb-0">Compare two reports to identify differences and trends.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="step3" class="step-container step-hidden">
+      <a href="javascript:void(0)" class="back-btn" onclick="showStep(2)">
+        <i class="fas fa-arrow-left me-2"></i> Back
+      </a>
+      <h5 class="mb-1">Compare <span id="comparisonTypeTitle" class="text-primary"></span> Reports</h5>
+      <p class="text-muted mb-3 small">Please select two reports to compare</p>
+
+      <div class="compare-selection-container mx-auto">
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <div class="report-selection-card">
+              <div>
+                <span class="step-indicator">Step 1</span>
+                <h5 class="fw-bold mb-1">Old Report</h5>
+                <p class="helper-text mb-0">Select the baseline report to compare against</p>
+              </div>
+              <button type="button" class="file-select-btn" id="file1Btn"
+                      onclick="triggerFileSelect(1)">
+                <div class="icon"><i class="fas fa-history"></i></div>
+                <div class="w-100">
+                  <span class="file-name d-block" id="file1NameDisplay">Choose Old Report</span>
+                  <span class="file-status" id="file1Status">No file selected</span>
+                </div>
+              </button>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="report-selection-card">
+              <div>
+                <span class="step-indicator">Step 2</span>
+                <h5 class="fw-bold mb-1">New Report</h5>
+                <p class="helper-text mb-0">Select the latest report to compare with the old report
+                </p>
+              </div>
+              <button type="button" class="file-select-btn" id="file2Btn"
+                      onclick="triggerFileSelect(2)">
+                <div class="icon"><i class="fas fa-sync-alt"></i></div>
+                <div class="w-100">
+                  <span class="file-name d-block" id="file2NameDisplay">Choose New Report</span>
+                  <span class="file-status" id="file2Status">No file selected</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="text-center">
+          <button id="executeCompareBtn" class="btn btn-primary" disabled
+                  onclick="executeSlottedComparison()">
+            Compare Reports
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <input type="file" id="fileInput" accept=".html" class="d-none">
+    <div id="fileName" class="mt-2 text-success fw-bold"></div>
+  </div>
+
+  <div id="stickyFileName" class="text-center mb-4" style="display: none;">
+    <h5 class="mb-0">Report: <span id="currentReportName" class="fw-bold"></span></h5>
+  </div>
+
+  <div id="resultsArea" style="display: none;">
+    <!-- New: Comparison Summary Table (Hidden by default, shown only in comparison) -->
+    <div id="comparisonSummaryContainer" style="display: none;" class="mb-4">
+      <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+        <div class="card-header bg-white py-3 border-bottom border-light">
+          <h6 class="mb-0 fw-bold text-secondary text-uppercase small letter-spacing-05">Comparison
+            Highlights</h6>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle" id="comparisonStatTable">
+              <thead class="table-light">
+              <tr>
+                <th class="ps-4">Metric</th>
+                <th class="text-center">Old Report</th>
+                <th class="text-center">New Report</th>
+                <th class="text-center">Common Scenarios</th>
+                <th class="text-center">Status Changed Scenarios</th>
+              </tr>
+              </thead>
+              <tbody>
+              <tr>
+                <td class="ps-4 fw-medium">Total Scenarios</td>
+                <td class="text-center" id="totalA">0</td>
+                <td class="text-center" id="totalB">0</td>
+                <td class="text-center">-</td>
+                <td class="text-center">-</td>
+              </tr>
+              <tr>
+                <td class="ps-4 fw-medium">Passed Scenarios</td>
+                <td class="text-center" id="passA">0</td>
+                <td class="text-center" id="passB">0</td>
+                <td class="text-center" id="commonPassCount">0</td>
+                <td class="text-center">
+                                            <span
+                                                    class="badge bg-success-subtle text-success border border-success-subtle"
+                                                    id="statusChangedPassCount">0</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="ps-4 fw-medium">Failed Scenarios</td>
+                <td class="text-center" id="failA">0</td>
+                <td class="text-center" id="failB">0</td>
+                <td class="text-center" id="commonFailCount">0</td>
+                <td class="text-center">
+                  <a href="javascript:void(0)" id="statusChangedFailLink"
+                     class="text-decoration-none">
+                                                <span
+                                                        class="badge bg-danger-subtle text-danger border border-danger-subtle fw-bold"
+                                                        style="cursor: pointer;" id="statusChangedFailCount">0</span>
+                  </a>
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="analysisResults">
+            <h4>
+                <div class="h4-accent bg-indigo"></div>Failure Summary (Failed Steps)
+            </h4>
+      <div class="row">
+        <div class="col-12">
+          <table id="summaryTable" class="table table-striped table-bordered" style="width:100%">
+            <thead>
+            <tr>
+              <th>Failed Step Line</th>
+              <th>Count</th>
+            </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+            <h4>
+                <div class="h4-accent bg-indigo"></div>Feature File Summary
+            </h4>
+            <div class="row">
+                <div class="col-12">
+                    <table id="featureTable" class="table table-striped table-bordered" style="width:100%">
+                        <thead>
+                        <tr>
+                            <th>Feature File</th>
+                            <th>Count</th>
+                        </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+      <div class="d-flex justify-content-between align-items-center mt-5 mb-2">
+        <h4 class="mb-0">
+          <div class="h4-accent bg-blue"></div>Failure Analysis Details <span id="analysisCount"
+                                                                              class="badge bg-primary rounded-pill ms-2">0</span>
+        </h4>
+        <button class="btn btn-warning shadow-sm" onclick="downloadHtmlReport()">Download Full HTML
+          Report</button>
+      </div>
+      <div id="allureCurrentViewLabel" class="mb-3 small text-muted" style="display: none;"></div>
+
+      <div id="allureLoading" class="text-center mb-3" style="display: none;">
+        <div class="spinner-border text-primary" role="status" aria-label="Loading"></div>
+        <div class="small text-muted mt-2">Loading analysis details...</div>
+      </div>
+
+      <table id="analysisTable" class="table table-bordered" style="width:100%">
+        <thead>
+        <tr>
+          <th>Test Case ID</th>
+          <th>Scenario Name</th>
+          <th>Failed Step Line</th>
+          <th>Error Message</th>
+          <th>Failure Media</th>
+          <th>Actions</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div id="comparisonResults" style="display: none;">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4>
+          <div class="h4-accent bg-indigo"></div>Report Comparison Summary
+        </h4>
+        <button class="btn btn-outline-secondary btn-sm" onclick="showStep(2)">
+          <i class="fas fa-redo me-1"></i> New Comparison
+        </button>
+      </div>
+
+      <div class="row mb-4">
+        <div class="col-md-6">
+          <div class="card bg-light border-0 shadow-sm border-start border-4 border-primary">
+            <div class="card-body py-2">
+              <h6 class="text-muted mb-0 small">Old Report (Report 1)</h6>
+              <div id="reportAName" class="fw-bold text-truncate" style="max-width: 100%;"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card bg-light border-0 shadow-sm border-start border-4 border-info">
+            <div class="card-body py-2">
+              <h6 class="text-muted mb-0 small">New Report (Report 2)</h6>
+              <div id="reportBName" class="fw-bold text-truncate" style="max-width: 100%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table id="comparisonTable" class="table table-bordered shadow-sm" style="width:100%">
+          <thead class="table-dark">
+          <tr>
+            <th style="width: 50%;">Scenario Name</th>
+            <th class="text-center">Old Report Status (Report 1)</th>
+            <th class="text-center">New Report Status (Report 2)</th>
+          </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Image Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Failure Screenshot</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center">
+        <img src="" class="modal-img" id="fullImage">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Allure Detail Modal -->
+<div class="modal fade" id="allureDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="allureDetailTitle">Allure Test Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2"><strong>Package:</strong> <span id="allureDetailPackage"></span></div>
+        <div class="mb-2"><strong>Status:</strong> <span id="allureDetailStatus"></span></div>
+        <div class="mb-3"><strong>Duration:</strong> <span id="allureDetailDuration"></span></div>
+        <div class="mb-2"><strong>Request/Test Data</strong></div>
+        <pre class="allure-pre mb-3" id="allureDetailRequestData"></pre>
+        <div class="mb-2"><strong>Error Details</strong></div>
+        <pre class="allure-pre" id="allureDetailErrorData"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.7.0.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/fixedheader/3.4.0/js/dataTables.fixedHeader.min.js"></script>
+
+<!-- DataTables Buttons -->
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+
+
+<script>
+  // Global variable to track report type
+  let currentReportType = 'EXTENT';
+  let currentAction = 'analysis';
+  let comparisonFile1 = null;
+  let comparisonFile2 = null;
+  let activeFileSlot = null; // 1 or 2 when specifically choosing a file for comparison
+  let lastComparisonReport2Content = null;
+  let lastNewFailedScenarios = null;
+  let allureApiDetails = [];
+  let allureCurrentViewDetails = [];
+
+  const fileInput = document.getElementById('fileInput');
+  const dropArea = document.getElementById('drop-area');
+  const fileNameDisplay = document.getElementById('fileName');
+  const resultsArea = document.getElementById('resultsArea');
+
+  function showStep(stepNum) {
+      const steps = [
+          document.getElementById('step1'),
+          document.getElementById('step2'),
+          document.getElementById('step3')
+      ];
+
+      steps.forEach(s => {
+          s.classList.remove('step-visible');
+          s.classList.add('step-hidden');
+      });
+
+      setTimeout(() => {
+          const targetStep = document.getElementById(`step${stepNum}`);
+          targetStep.classList.remove('step-hidden');
+          targetStep.classList.add('step-visible');
+      }, 300);
+
+      // Reset comparison state if going back to step 1 or 2
+      if (stepNum < 3) {
+          comparisonFile1 = null;
+          comparisonFile2 = null;
+          updateComparisonUI();
+      }
+  }
+
+  function selectType(type) {
+      currentReportType = type;
+      let displayType = 'Spark Extent Report';
+      if (type === 'EXTENT') displayType = 'Extent Report';
+      if (type === 'ALLURE_API') displayType = 'Allure API Report';
+      document.getElementById('selectedReportType').innerText = displayType;
+      document.getElementById('comparisonTypeTitle').innerText = displayType;
+      showStep(2);
+  }
+
+  function startAction(action) {
+      currentAction = action;
+      if (action === 'compare') {
+          showStep(3);
+      } else {
+          fileInput.removeAttribute('multiple');
+          fileInput.click();
+      }
+  }
+
+  function triggerFileSelect(slot) {
+      activeFileSlot = slot;
+      fileInput.removeAttribute('multiple');
+      fileInput.click();
+  }
+
+  function updateComparisonUI() {
+      const f1Name = document.getElementById('file1NameDisplay');
+      const f1Status = document.getElementById('file1Status');
+      const f2Name = document.getElementById('file2NameDisplay');
+      const f2Status = document.getElementById('file2Status');
+      const compareBtn = document.getElementById('executeCompareBtn');
+
+      const f1Btn = document.getElementById('file1Btn');
+      const f2Btn = document.getElementById('file2Btn');
+
+      if (comparisonFile1) {
+          f1Name.innerText = comparisonFile1.name;
+          f1Status.innerText = "Ready to compare";
+          f1Status.classList.replace('text-muted', 'text-success');
+          f1Btn.classList.add('file-ready');
+      } else {
+          f1Name.innerText = "Choose Old Report";
+          f1Status.innerText = "No file selected";
+          f1Status.classList.add('text-muted');
+          f1Status.classList.remove('text-success');
+          f1Btn.classList.remove('file-ready');
+      }
+
+      if (comparisonFile2) {
+          f2Name.innerText = comparisonFile2.name;
+          f2Status.innerText = "Ready to compare";
+          f2Status.classList.replace('text-muted', 'text-success');
+          f2Btn.classList.add('file-ready');
+      } else {
+          f2Name.innerText = "Choose New Report";
+          f2Status.innerText = "No file selected";
+          f2Status.classList.add('text-muted');
+          f2Status.classList.remove('text-success');
+          f2Btn.classList.remove('file-ready');
+      }
+
+      compareBtn.disabled = !(comparisonFile1 && comparisonFile2);
+  }
+
+  function executeSlottedComparison() {
+      if (comparisonFile1 && comparisonFile2) {
+          const files = [comparisonFile1, comparisonFile2];
+          fileNameDisplay.innerText = `Selected: ${files[0].name} and ${files[1].name}`;
+          document.getElementById('currentReportName').innerText = `${files[0].name} vs ${files[1].name}`;
+          processComparison(files);
+      }
+  }
+
+  // AI Analysis Function
+  async function analyzeFailure(button) {
+      console.log('analyzeFailure called');
+      console.log('Button:', button);
+
+      const scenario = button.getAttribute('data-scenario');
+      const step = button.getAttribute('data-step');
+      const error = button.getAttribute('data-error');
+      const image = button.getAttribute('data-image');
+      const video = button.getAttribute('data-video');
+      const testid = button.getAttribute('data-testid');
+
+      console.log('Failure data:', { scenario, step, error, image, video, testid });
+
+      // Show modal using simple DOM manipulation (most reliable method)
+      let modalElement = document.getElementById('aiAnalysisModal');
+
+      // If modal doesn't exist, create it dynamically
+      if (!modalElement) {
+          console.warn('Modal not found in DOM, creating it dynamically');
+          const modalHTML = `
+<div class="modal fade" id="aiAnalysisModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title"><i class="fas fa-brain me-2"></i>AI Failure Analysis</h5>
+        <button type="button" class="btn-close btn-close-white" onclick="closeAIAnalysisModal()" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="aiAnalysisLoading" class="text-center py-5" style="display: none;">
+          <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <h5 class="text-muted">Analyzing failure with AI...</h5>
+          <p class="text-muted small">This may take a few moments</p>
+        </div>
+        <div id="aiAnalysisContent" style="display: none;">
+          <div class="mb-3">
+            <h6 class="fw-bold text-primary"><i class="fas fa-vial me-2"></i>Test Scenario</h6>
+            <div class="bg-light p-3 rounded">
+              <p class="mb-1"><strong>Scenario:</strong> <span id="aiScenarioName"></span></p>
+              <p class="mb-1"><strong>Failed Step:</strong> <span id="aiFailedStep" class="text-danger"></span></p>
+              <p class="mb-0"><strong>Error:</strong> <span id="aiError" class="text-muted small"></span></p>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <div class="card border-primary">
+                <div class="card-header bg-primary text-white"><i class="fas fa-tag me-2"></i>Classification</div>
+                <div class="card-body"><h5 id="aiClassification" class="text-primary"></h5></div>
+              </div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <div class="card border-warning">
+                <div class="card-header bg-warning"><i class="fas fa-tachometer-alt me-2"></i>Confidence Level</div>
+                <div class="card-body">
+                  <div class="progress" style="height: 30px;"><div id="aiConfidenceBar" class="progress-bar" role="progressbar" style="width: 0%"></div></div>
+                  <span id="aiConfidence" class="fw-bold"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card border-danger mb-3">
+            <div class="card-header bg-danger text-white"><i class="fas fa-exclamation-circle me-2"></i>Root Cause</div>
+            <div class="card-body"><p id="aiRootCause" class="mb-0"></p></div>
+          </div>
+          <div class="card border-info mb-3">
+            <div class="card-header bg-info text-white"><i class="fas fa-clipboard-list me-2"></i>Evidence</div>
+            <div class="card-body"><ul id="aiEvidence" class="mb-0"></ul></div>
+          </div>
+          <div class="card border-success mb-3">
+            <div class="card-header bg-success text-white"><i class="fas fa-tools me-2"></i>Recommended Action</div>
+            <div class="card-body">
+              <p id="aiRecommendedAction" class="mb-2"></p>
+              <div id="aiSuggestedFixSection" style="display: none;">
+                <h6 class="fw-bold mt-3">Suggested Fix:</h6>
+                <pre id="aiSuggestedFix" class="bg-light p-3 rounded"></pre>
+              </div>
+            </div>
+          </div>
+          <div id="aiStepsSection" class="card border-secondary mb-3" style="display: none;">
+            <div class="card-header bg-secondary text-white"><i class="fas fa-list-ol me-2"></i>Steps to Reproduce</div>
+            <div class="card-body"><ol id="aiStepsToReproduce" class="mb-0"></ol></div>
+          </div>
+        </div>
+        <div id="aiAnalysisError" class="alert alert-danger" role="alert" style="display: none;">
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          <span id="aiErrorMessage"></span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeAIAnalysisModal()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>`;
+          document.body.insertAdjacentHTML('beforeend', modalHTML);
+          modalElement = document.getElementById('aiAnalysisModal');
+      }
+
+      const loadingElement = document.getElementById('aiAnalysisLoading');
+      const contentElement = document.getElementById('aiAnalysisContent');
+      const errorElement = document.getElementById('aiAnalysisError');
+
+      // Verify elements exist
+      if (!modalElement || !loadingElement || !contentElement || !errorElement) {
+          console.error('Modal elements not found in DOM even after creation attempt');
+          alert('Error: Modal components not loaded. Please refresh the page.');
+          return;
+      }
+
+      // Show modal manually
+      modalElement.style.display = 'block';
+      modalElement.classList.add('show');
+      document.body.classList.add('modal-open');
+
+      // Add backdrop
+      let backdrop = document.getElementById('ai-modal-backdrop');
+      if (!backdrop) {
+          backdrop = document.createElement('div');
+          backdrop.className = 'modal-backdrop fade show';
+          backdrop.id = 'ai-modal-backdrop';
+          document.body.appendChild(backdrop);
+      }
+
+      // Show loading state
+      loadingElement.style.display = 'block';
+      contentElement.style.display = 'none';
+      errorElement.style.display = 'none';
+
+      // Disable button during analysis
+      const originalHtml = button.innerHTML;
+      button.disabled = true;
+      button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Analyzing...';
+
+      try {
+          // Extract all steps context for better analysis
+          let allStepsContext = '';
+          try {
+              // Try to find the test scenario in the original report to get all steps
+              const reportContent = document.body.innerHTML;
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(reportContent, 'text/html');
+
+              // Search for the scenario containing this failed step
+              const allTestItems = doc.querySelectorAll('.test-item, .node, .scenario');
+              for (const item of allTestItems) {
+                  const itemText = item.textContent || '';
+                  if (itemText.includes(scenario.substring(0, 30))) {
+                      // Found the scenario, extract all steps
+                      const steps = item.querySelectorAll('.step, li');
+                      if (steps.length > 0) {
+                          const stepTexts = Array.from(steps).map((s, idx) => {
+                              const stepText = s.textContent.trim();
+                              const isFailedStep = stepText.includes(step) || step.includes(stepText.substring(0, 20));
+                              return `${idx + 1}. ${stepText}${isFailedStep ? ' ← FAILED HERE' : ''}`;
+                          }).filter(t => t.length > 5);
+
+                          if (stepTexts.length > 0) {
+                              allStepsContext = stepTexts.join('\n');
+                              break;
+                          }
+                      }
+                  }
+              }
+
+              // If no steps found, create a minimal context
+              if (!allStepsContext) {
+                  allStepsContext = `Failed Step: ${step}\nError: ${error.substring(0, 200)}`;
+              }
+          } catch (e) {
+              console.warn('Could not extract all steps:', e);
+              allStepsContext = `Failed Step: ${step}`;
+          }
+
+          // Prepare comprehensive request
+          const requestBody = {
+              testName: testid || scenario,
+              scenario: scenario,
+              failedStep: step,
+              error: error,
+              failureImage: image || '',
+              videoUrl: video || '',
+              reportType: currentReportType,
+              allSteps: allStepsContext,
+              feature: scenario.split(/[:-]/)[0].trim() || 'Unknown Feature',
+              stackTrace: error.includes('at ') ? error : '',
+              consoleLogs: ''
+          };
+
+          console.log('Sending API request:', requestBody);
+          console.log('All steps context length:', allStepsContext.length);
+
+          // Call API
+          const response = await fetch('/api/investigations', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(requestBody)
+          });
+
+          console.log('API response status:', response.status);
+
+          if (!response.ok) {
+              const errorText = await response.text();
+              console.error('API error response:', errorText);
+              throw new Error(`API returned status ${response.status}: ${response.statusText}`);
+          }
+
+          const result = await response.json();
+          console.log('API result:', result);
+
+          // Display results
+          displayAIAnalysis(result, scenario, step, error, image);
+
+      } catch (err) {
+          console.error('Error analyzing failure:', err);
+          document.getElementById('aiAnalysisLoading').style.display = 'none';
+          document.getElementById('aiAnalysisError').style.display = 'block';
+          document.getElementById('aiErrorMessage').textContent =
+              'Failed to analyze failure: ' + err.message + '. Please ensure Ollama is running and try again.';
+      } finally {
+          // Re-enable button
+          button.disabled = false;
+          button.innerHTML = originalHtml;
+      }
+  }
+
+  // Make function globally available
+  window.analyzeFailure = analyzeFailure;
+
+  // Helper function to close AI Analysis modal
+  function closeAIAnalysisModal() {
+      const modalElement = document.getElementById('aiAnalysisModal');
+      const backdrop = document.getElementById('ai-modal-backdrop');
+
+      // Hide modal
+      if (modalElement) {
+          modalElement.style.display = 'none';
+          modalElement.classList.remove('show');
+      }
+
+      // Remove backdrop
+      if (backdrop) {
+          backdrop.remove();
+      }
+
+      // Remove modal-open class from body
+      document.body.classList.remove('modal-open');
+
+      // Remove any stray Bootstrap backdrops
+      document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+  }
+  window.closeAIAnalysisModal = closeAIAnalysisModal;
+
+  // Add click handler to modal backdrop
+  document.addEventListener('click', function(e) {
+      if (e.target && e.target.id === 'ai-modal-backdrop') {
+          closeAIAnalysisModal();
+      }
+  });
+
+  // Also handle clicks on modal background (outside dialog)
+  document.addEventListener('click', function(e) {
+      const modal = document.getElementById('aiAnalysisModal');
+      if (e.target === modal) {
+          closeAIAnalysisModal();
+      }
+  });
+
+  // ------------------------------------------------------------------------------------------
+  // Human classification feedback: renders the AI/Human/Effective classification + source, and
+  // handles the "Change Classification" editor (open/save/cancel).
+  // ------------------------------------------------------------------------------------------
+  function renderClassificationFeedback(result) {
+      const sourceLabelEl = document.getElementById('classificationSourceLabel');
+      const changeBtn = document.getElementById('changeClassificationBtn');
+      if (!sourceLabelEl || !changeBtn) return;
+
+      const source = result.source || 'AI';
+      const aiClassification = result.aiClassification || result.classification || 'UNKNOWN';
+      const humanClassification = result.humanClassification || null;
+
+      let label = 'AI Analysis';
+      let badgeClass = 'badge bg-secondary';
+      if (source === 'HUMAN_CORRECTED') {
+          label = 'Human Corrected';
+          badgeClass = 'badge bg-success';
+      } else if (source === 'HISTORICAL') {
+          label = 'Historical Knowledge';
+          badgeClass = 'badge bg-info text-dark';
+      }
+      sourceLabelEl.textContent = label;
+      sourceLabelEl.className = badgeClass;
+
+      let title = 'AI Classification: ' + aiClassification;
+      if (humanClassification) {
+          title += ' | Human Classification: ' + humanClassification;
+      }
+      sourceLabelEl.title = title;
+
+      // Reset editor to closed state whenever a new analysis is displayed.
+      const editor = document.getElementById('classificationEditor');
+      if (editor) editor.style.display = 'none';
+      changeBtn.style.display = result.failureId ? 'inline-block' : 'none';
+      const errorEl = document.getElementById('classificationSaveError');
+      if (errorEl) errorEl.style.display = 'none';
+  }
+
+  function openClassificationEditor() {
+      const result = window.currentAIAnalysisResult && window.currentAIAnalysisResult.result;
+      if (!result) return;
+      const editor = document.getElementById('classificationEditor');
+      const select = document.getElementById('classificationSelect');
+      if (!editor || !select) return;
+      const current = result.humanClassification || result.classification || 'UNKNOWN';
+      select.value = current;
+      editor.style.display = 'block';
+      const errorEl = document.getElementById('classificationSaveError');
+      if (errorEl) errorEl.style.display = 'none';
+  }
+
+  function cancelClassificationEdit() {
+      const editor = document.getElementById('classificationEditor');
+      if (editor) editor.style.display = 'none';
+      const errorEl = document.getElementById('classificationSaveError');
+      if (errorEl) errorEl.style.display = 'none';
+  }
+
+  async function saveClassificationCorrection() {
+      const result = window.currentAIAnalysisResult && window.currentAIAnalysisResult.result;
+      const select = document.getElementById('classificationSelect');
+      const errorEl = document.getElementById('classificationSaveError');
+      if (!result || !result.failureId || !select) return;
+
+      const chosen = select.value;
+      // Keep the currently displayed classification unchanged unless the save succeeds.
+      try {
+          const response = await fetch(`/api/failures/${encodeURIComponent(result.failureId)}/classification`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ humanClassification: chosen })
+          });
+
+          if (!response.ok) {
+              const text = await response.text();
+              throw new Error(`Save failed (status ${response.status}): ${text}`);
+          }
+
+          const updated = await response.json();
+
+          // Update the in-memory result and re-render, without touching anything else.
+          result.humanClassification = updated.humanClassification;
+          result.aiClassification = updated.aiClassification || result.aiClassification;
+          result.source = updated.source;
+          result.classification = updated.effectiveClassification;
+
+          document.getElementById('aiClassification').textContent =
+              (result.classification || 'UNKNOWN').replace(/_/g, ' ');
+          renderClassificationFeedback(result);
+      } catch (err) {
+          console.error('Failed to save classification correction:', err);
+          if (errorEl) {
+              errorEl.textContent = 'Could not save your correction. Please try again. (' + err.message + ')';
+              errorEl.style.display = 'block';
+          }
+          // Do NOT change the displayed classification on failure.
+      }
+  }
+
+  function displayAIAnalysis(result, scenario, step, error, image) {
+      console.log('Displaying AI Analysis:', result);
+
+      // Clean up any dynamically added cards from previous analysis
+      document.querySelectorAll('#aiAnalysisContent .card.dynamic-card').forEach(el => el.remove());
+
+      // Clean up metadata badges from previous analysis
+      const oldMetadata = document.getElementById('aiAnalysisMetadata');
+      if (oldMetadata) {
+          oldMetadata.remove();
+      }
+
+      // Hide loading, show content
+      document.getElementById('aiAnalysisLoading').style.display = 'none';
+      document.getElementById('aiAnalysisContent').style.display = 'block';
+
+      // Store result globally for copy functionality
+      window.currentAIAnalysisResult = { result, scenario, step, error, image };
+
+      // Display test info
+      document.getElementById('aiScenarioName').textContent = scenario;
+      document.getElementById('aiFailedStep').textContent = step;
+      const errorDisplay = error.substring(0, 300) + (error.length > 300 ? '...' : '');
+      document.getElementById('aiError').textContent = errorDisplay;
+
+      // Classification
+      const classification = result.classification || 'UNKNOWN';
+      document.getElementById('aiClassification').textContent = classification.replace(/_/g, ' ');
+      renderClassificationFeedback(result);
+
+      // Confidence
+      const confidence = result.confidence || 0;
+      const confidenceBar = document.getElementById('aiConfidenceBar');
+      confidenceBar.style.width = confidence + '%';
+      confidenceBar.textContent = confidence + '%';
+
+      // Color code confidence
+      if (confidence >= 80) {
+          confidenceBar.className = 'progress-bar bg-success';
+      } else if (confidence >= 50) {
+          confidenceBar.className = 'progress-bar bg-warning';
+      } else {
+          confidenceBar.className = 'progress-bar bg-danger';
+      }
+
+      const confidenceEl = document.getElementById('aiConfidence');
+      if (confidenceEl) {
+          confidenceEl.textContent = confidence + '% ' + (confidence >= 80 ? '(High)' : confidence >= 50 ? '(Medium)' : '(Low)');
+      }
+
+      // Root Cause
+      document.getElementById('aiRootCause').textContent = result.rootCause || 'Not determined';
+
+      // Evidence
+      const evidenceList = document.getElementById('aiEvidence');
+      evidenceList.innerHTML = '';
+      if (result.evidence && result.evidence.length > 0) {
+          result.evidence.forEach(item => {
+              const li = document.createElement('li');
+              li.className = 'mb-2';
+              li.innerHTML = `<i class="fas fa-check-circle text-success me-2"></i>${escapeHtml(item)}`;
+              evidenceList.appendChild(li);
+          });
+      } else {
+          evidenceList.innerHTML = '<li class="text-muted">No evidence provided</li>';
+      }
+
+      // Recommended Action - Split by semicolon or period for better formatting
+      const recommendedActionEl = document.getElementById('aiRecommendedAction');
+      if (result.recommendedAction && result.recommendedAction.trim()) {
+          // Split by semicolon or number patterns like "1.", "2.", etc.
+          const actions = result.recommendedAction.split(/[;]|(?=\d+\.)/g)
+              .map(s => s.trim())
+              .filter(s => s.length > 0);
+
+          if (actions.length > 1) {
+              // Multiple actions - show as list
+              recommendedActionEl.innerHTML = '<ul class="mb-0"></ul>';
+              const ul = recommendedActionEl.querySelector('ul');
+              actions.forEach(action => {
+                  const li = document.createElement('li');
+                  li.className = 'mb-2';
+                  li.textContent = action.replace(/^\d+\.\s*/, ''); // Remove leading number
+                  ul.appendChild(li);
+              });
+          } else {
+              // Single action - show as paragraph
+              recommendedActionEl.textContent = result.recommendedAction;
+          }
+      } else {
+          recommendedActionEl.innerHTML = '<p class="text-muted mb-0"><i class="fas fa-info-circle me-2"></i>No specific recommendation available</p>';
+      }
+
+      // Suggested Fix
+      if (result.suggestedFix && result.suggestedFix.trim()) {
+          document.getElementById('aiSuggestedFixSection').style.display = 'block';
+          document.getElementById('aiSuggestedFix').textContent = result.suggestedFix;
+      } else {
+          document.getElementById('aiSuggestedFixSection').style.display = 'none';
+      }
+
+      // Steps to Reproduce
+      const stepsSection = document.getElementById('aiStepsSection');
+      if (result.stepsToReproduce && result.stepsToReproduce.length > 0) {
+          stepsSection.style.display = 'block';
+          const stepsList = document.getElementById('aiStepsToReproduce');
+          stepsList.innerHTML = '';
+          result.stepsToReproduce.forEach(stepText => {
+              const li = document.createElement('li');
+              li.className = 'mb-2';
+              li.textContent = stepText;
+              stepsList.appendChild(li);
+          });
+      } else {
+          stepsSection.style.display = 'none';
+      }
+
+      // Add additional sections that don't exist in the minimal modal
+      // Insert after recommended action card
+      const recommendedActionCard = document.getElementById('aiRecommendedAction').closest('.card');
+
+      // Prevention Tips
+      if (result.preventionTips && result.preventionTips.length > 0) {
+          const preventionCard = createInfoCard(
+              'Prevention Tips',
+              'fas fa-shield-alt',
+              'warning',
+              result.preventionTips.map(tip => `<li class="mb-2"><i class="fas fa-lightbulb text-warning me-2"></i>${escapeHtml(tip)}</li>`).join(''),
+              'list'
+          );
+          recommendedActionCard.parentNode.insertBefore(preventionCard, recommendedActionCard.nextSibling);
+      }
+
+      // Screenshot Observation
+      if (result.screenshotObservation && result.screenshotObservation.trim()) {
+          const screenshotCard = createInfoCard(
+              'Screenshot Analysis',
+              'fas fa-image',
+              'secondary',
+              escapeHtml(result.screenshotObservation),
+              'text'
+          );
+          recommendedActionCard.parentNode.insertBefore(screenshotCard, recommendedActionCard.nextSibling);
+      }
+
+      // Root Cause Type & Severity
+      if (result.rootCauseType || result.severity) {
+          const metaInfo = [];
+          if (result.rootCauseType) {
+              metaInfo.push(`<strong>Root Cause Type:</strong> <span class="badge bg-${result.rootCauseType === 'CONFIRMED' ? 'success' : result.rootCauseType === 'PROBABLE' ? 'warning' : 'secondary'}">${result.rootCauseType}</span>`);
+          }
+          if (result.severity) {
+              const severityColor = result.severity === 'CRITICAL' ? 'danger' : result.severity === 'HIGH' ? 'warning' : result.severity === 'MEDIUM' ? 'info' : 'secondary';
+              metaInfo.push(`<strong>Severity:</strong> <span class="badge bg-${severityColor}">${result.severity}</span>`);
+          }
+          if (metaInfo.length > 0) {
+              const rootCauseCard = document.getElementById('aiRootCause').closest('.card');
+              const metaDiv = document.createElement('div');
+              metaDiv.id = 'aiAnalysisMetadata';
+              metaDiv.className = 'mt-3 p-2 bg-light rounded';
+              metaDiv.innerHTML = metaInfo.join('<span class="mx-3"></span>');
+              rootCauseCard.querySelector('.card-body').appendChild(metaDiv);
+          }
+      }
+
+      // Similar Patterns
+      if (result.similarPatterns && result.similarPatterns.trim()) {
+          const patternsCard = createInfoCard(
+              'Similar Patterns',
+              'fas fa-clone',
+              'info',
+              escapeHtml(result.similarPatterns),
+              'text'
+          );
+          const lastCard = document.querySelector('#aiAnalysisContent .card:last-child');
+          lastCard.parentNode.appendChild(patternsCard);
+      }
+
+      // Missing Evidence
+      if (result.missingEvidence && result.missingEvidence.length > 0) {
+          const missingCard = createInfoCard(
+              'Missing Evidence',
+              'fas fa-question-circle',
+              'secondary',
+              result.missingEvidence.map(item => `<li>${escapeHtml(item)}</li>`).join(''),
+              'list'
+          );
+          const lastCard = document.querySelector('#aiAnalysisContent .card:last-child');
+          lastCard.parentNode.appendChild(missingCard);
+      }
+  }
+
+  // Helper function to create info cards dynamically
+  function createInfoCard(title, icon, color, content, type) {
+      const card = document.createElement('div');
+      card.className = `card border-${color} mb-3 dynamic-card`;
+      const colorClass = color === 'warning' || color === 'info' || color === 'secondary' ? '' : 'text-white';
+      card.innerHTML = `
+          <div class="card-header bg-${color} ${colorClass}">
+              <i class="${icon} me-2"></i>${title}
+          </div>
+          <div class="card-body">
+              ${type === 'list' ? '<ul class="mb-0">' + content + '</ul>' : '<p class="mb-0">' + content + '</p>'}
+          </div>
+      `;
+      return card;
+  }
+
+  // Helper function to escape HTML
+  function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+  }
+
+  // Helper functions for classification and severity
+  function getClassificationIcon(classification) {
+      const icons = {
+          'Environment Issue': '🌍',
+          'Application Bug': '🐛',
+          'Test Issue': '🧪',
+          'Infrastructure': '🏗️',
+          'Configuration': '⚙️',
+          'Network': '🌐',
+          'Timeout': '⏱️',
+          'Data Issue': '📊',
+          'Unknown': '❓'
+      };
+      for (const key in icons) {
+          if (classification.toLowerCase().includes(key.toLowerCase())) {
+              return icons[key];
+          }
+      }
+      return '📋';
+  }
+
+  function extractCodeLocations(result, errorMessage) {
+      const locations = [];
+
+      // 1. Extract from stack trace in error message
+      const stackTraceRegex = /at\s+([a-zA-Z0-9_$.]+)\(([^:)]+):(\d+)\)/g;
+      let match;
+      const seenFiles = new Set();
+
+      while ((match = stackTraceRegex.exec(errorMessage)) !== null) {
+          const [, method, file, line] = match;
+          if (!seenFiles.has(file)) {
+              seenFiles.add(file);
+              locations.push({
+                  file: file,
+                  line: line,
+                  method: method,
+                  description: 'From error stack trace - check this method implementation'
+              });
+          }
+      }
+
+      // 2. Extract from suggested fix
+      if (result.suggestedFix) {
+          const fileRegex = /(?:File|file|Check):\s*([a-zA-Z0-9_/.]+\.(?:java|js|ts|py|rb|go|kt))/gi;
+          while ((match = fileRegex.exec(result.suggestedFix)) !== null) {
+              const file = match[1];
+              if (!seenFiles.has(file)) {
+                  seenFiles.add(file);
+                  locations.push({
+                      file: file,
+                      line: null,
+                      method: null,
+                      description: 'Suggested by AI - review this file for potential issues'
+                  });
+              }
+          }
+
+          // Extract line numbers mentioned
+          const lineRegex = /line\s*(\d+)/gi;
+          const lines = [];
+          while ((match = lineRegex.exec(result.suggestedFix)) !== null) {
+              lines.push(match[1]);
+          }
+
+          // Add line info to last location if available
+          if (lines.length > 0 && locations.length > 0) {
+              locations[locations.length - 1].line = lines[0];
+          }
+      }
+
+      // 3. Extract from error message patterns
+      const commonPatterns = [
+          { regex: /CommonPage\.(\w+)/, description: 'Page Object method that failed' },
+          { regex: /([A-Z][a-zA-Z0-9]+Page)\.(\w+)/, description: 'Page Object interaction point' },
+          { regex: /([A-Z][a-zA-Z0-9]+)\.(\w+)\(/, description: 'Class method in error' }
+      ];
+
+      for (const pattern of commonPatterns) {
+          const match = errorMessage.match(pattern.regex);
+          if (match) {
+              const className = match[1];
+              const methodName = match[2] || match[1];
+              const fileName = `${className}.java`;
+
+              if (!seenFiles.has(fileName)) {
+                  seenFiles.add(fileName);
+                  locations.push({
+                      file: fileName,
+                      line: null,
+                      method: methodName,
+                      description: pattern.description
+                  });
+              }
+          }
+      }
+
+      // 4. If still no locations, provide generic guidance based on error type
+      if (locations.length === 0) {
+          if (errorMessage.includes('TimeoutException')) {
+              locations.push({
+                  file: 'WebDriver configuration',
+                  line: null,
+                  method: null,
+                  description: 'Check timeout settings and element locators'
+              });
+          } else if (errorMessage.includes('NullPointerException')) {
+              locations.push({
+                  file: 'Test setup/teardown',
+                  line: null,
+                  method: null,
+                  description: 'Check object initialization and null checks'
+              });
+          } else if (errorMessage.includes('ElementNotFound') || errorMessage.includes('NoSuchElement')) {
+              locations.push({
+                  file: 'Page Object locators',
+                  line: null,
+                  method: null,
+                  description: 'Verify element selectors and page synchronization'
+              });
+          }
+      }
+
+      return locations.slice(0, 5); // Limit to top 5 locations
+  }
+
+  function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+          showCopyNotification('Path copied to clipboard!');
+      }).catch(err => {
+          console.error('Failed to copy:', err);
+      });
+  }
+  window.copyToClipboard = copyToClipboard;
+
+  function getSeverityClass(severity) {
+      const severityMap = {
+          'critical': 'text-danger fw-bold',
+          'high': 'text-danger',
+          'medium': 'text-warning',
+          'low': 'text-info',
+          'minor': 'text-secondary'
+      };
+      return severityMap[severity.toLowerCase()] || 'text-warning';
+  }
+
+  function getSeverityDescription(severity) {
+      const descriptions = {
+          'critical': 'Requires immediate attention',
+          'high': 'Should be addressed soon',
+          'medium': 'Normal priority',
+          'low': 'Can be addressed later',
+          'minor': 'Cosmetic or minor issue'
+      };
+      return descriptions[severity.toLowerCase()] || 'Priority not specified';
+  }
+
+  // Copy functionality
+  function copyAnalysisToClipboard() {
+      const data = window.currentAIAnalysisResult;
+      if (!data) return;
+
+      const text = `
+=== AI Failure Analysis Report ===
+
+Test Scenario: ${data.scenario}
+Failed Step: ${data.step}
+Error: ${data.error}
+
+Classification: ${data.result.classification || 'Unknown'}
+Confidence: ${data.result.confidence || 0}%
+Severity: ${data.result.severity || 'Medium'}
+
+Root Cause:
+${data.result.rootCause || 'Not determined'}
+
+Evidence:
+${data.result.evidence ? data.result.evidence.map((e, i) => `${i + 1}. ${e}`).join('\n') : 'None'}
+
+Recommended Action:
+${data.result.recommendedAction || 'None'}
+
+${data.result.suggestedFix ? `Suggested Fix:\n${data.result.suggestedFix}\n` : ''}
+${data.result.stepsToReproduce ? `Steps to Reproduce:\n${data.result.stepsToReproduce.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n` : ''}
+${data.result.preventionTips ? `Prevention Tips:\n${data.result.preventionTips.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n` : ''}
+      `.trim();
+
+      navigator.clipboard.writeText(text).then(() => {
+          showCopyNotification('Analysis copied to clipboard!');
+      }).catch(err => {
+          console.error('Failed to copy:', err);
+          alert('Failed to copy to clipboard');
+      });
+  }
+  window.copyAnalysisToClipboard = copyAnalysisToClipboard;
+
+  function copyCodeToClipboard() {
+      const code = document.getElementById('aiSuggestedFix').textContent;
+      navigator.clipboard.writeText(code).then(() => {
+          showCopyNotification('Code copied to clipboard!');
+      }).catch(err => {
+          console.error('Failed to copy:', err);
+      });
+  }
+  window.copyCodeToClipboard = copyCodeToClipboard;
+
+  function showCopyNotification(message) {
+      const notification = document.createElement('div');
+      notification.className = 'alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3';
+      notification.style.zIndex = '9999';
+      notification.innerHTML = `<i class="fas fa-check-circle me-2"></i>${message}`;
+      document.body.appendChild(notification);
+      setTimeout(() => notification.remove(), 2000);
+  }
+
+  // Drag and Drop events
+  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, preventDefaults, false);
+  });
+
+  function preventDefaults(e) {
+      e.preventDefault();
+      e.stopPropagation();
+  }
+
+  dropArea.addEventListener('drop', handleDrop, false);
+
+  function handleDrop(e) {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      handleFiles(files);
+  }
+
+  fileInput.addEventListener('change', function () {
+      handleFiles(this.files);
+  });
+
+  function handleFiles(files) {
+      if (files.length > 0) {
+          if (currentAction === 'analysis') {
+              const file = files[0];
+              fileNameDisplay.innerText = "Selected: " + file.name;
+              document.getElementById('currentReportName').innerText = file.name;
+              processFile(file);
+          } else if (currentAction === 'compare') {
+              // Check if we are in the "Choose Report 1/2" flow (activeFileSlot is set)
+              if (activeFileSlot) {
+                  if (activeFileSlot === 1) {
+                      comparisonFile1 = files[0];
+                  } else if (activeFileSlot === 2) {
+                      comparisonFile2 = files[0];
+                  }
+                  activeFileSlot = null; // Reset slot
+                  updateComparisonUI();
+              } else {
+                  // Drag & Drop flow
+                  if (files.length !== 2) {
+                      alert("Please select exactly two files for comparison.");
+                      return;
+                  }
+                  comparisonFile1 = files[0];
+                  comparisonFile2 = files[1];
+                  executeSlottedComparison();
+              }
+          }
+      }
+  }
+
+  async function processComparison(files) {
+      const results = await Promise.all([readFileAsText(files[0]), readFileAsText(files[1])]);
+      lastComparisonReport2Content = results[1];
+      const dataA = getAnalysisData(results[0]);
+      const dataB = getAnalysisData(results[1]);
+
+      displayComparisonResults(files[0].name, files[1].name, dataA, dataB);
+  }
+
+  function readFileAsText(file) {
+      return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.readAsText(file);
+      });
+  }
+
+  function getAnalysisData(htmlContent) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlContent, "text/html");
+      const scenarioMap = {}; // Name -> { status, testCaseID }
+
+      if (currentReportType === 'ALLURE_API') {
+          const parsed = parseAllureEmbeddedEntries(htmlContent);
+          const packageTree = parsed.jsonMap['data/packages.json'];
+          if (!packageTree) return { scenarioMap };
+
+          const leafTests = flattenAllurePackages(packageTree);
+          const testCaseMap = new Map();
+          Object.keys(parsed.jsonMap)
+              .filter(k => k.startsWith('data/test-cases/') && k.endsWith('.json'))
+              .forEach(k => {
+                  const tc = parsed.jsonMap[k];
+                  if (tc && tc.uid) testCaseMap.set(tc.uid, tc);
+              });
+
+          leafTests.forEach(leaf => {
+              const tc = testCaseMap.get(leaf.uid) || {};
+              const rawStatus = normalizeAllureStatus(tc.status || leaf.status);
+              let status = 'Not Present';
+              if (rawStatus === 'passed') status = 'Pass';
+              else if (rawStatus === 'failed') status = 'Fail';
+              else if (rawStatus === 'broken') status = 'Broken';
+              else if (rawStatus === 'skipped') status = 'Skipped';
+              else if (rawStatus === 'unknown') status = 'Unknown';
+
+              const scenarioName = `${leaf.packagePath || 'root'} :: ${tc.name || leaf.testName || 'Unknown Test'}`;
+              scenarioMap[scenarioName] = { status, testCaseID: '' };
+          });
+
+          return { scenarioMap };
+      }
+
+      if (currentReportType === 'EXTENT') {
+          const searchRoot = doc.querySelector('#test-collection, .test-collection, #test-view, .test-view') || doc;
+          const allNodes = Array.from(searchRoot.querySelectorAll(".node.scenario, .scenario, .bdd-test, .test-item"));
+
+          allNodes.forEach(node => {
+              let name = "";
+              const nameElem = node.querySelector(".scenario-name, .scenario-heading, .status-p, .node-name, .test-name, .name");
+              if (nameElem) {
+                  const clone = nameElem.cloneNode(true);
+                  clone.querySelectorAll('.badge, .status, .timestamp').forEach(el => el.remove());
+                  name = clone.innerText.trim();
+              } else if (node.getAttribute("title") || node.getAttribute("name")) {
+                  name = (node.getAttribute("title") || node.getAttribute("name"));
+              }
+
+              if (name) {
+                  name = name.replace(/Scenario Outline:|Scenario:|Test Case:/gi, "").trim().replace(/^cancel\s*/i, "");
+                  const hasChildren = node.querySelector(".node.scenario, .scenario");
+                  if (hasChildren && hasChildren !== node) return;
+
+                  const statusAttr = (node.getAttribute('status') || '').toLowerCase();
+                  const hasFail = statusAttr === 'fail' || statusAttr === 'error' ||
+                      node.querySelector('.fail-bg, .status.fail, .error-bg') !== null ||
+                      node.innerText.trim().toLowerCase().startsWith('cancel');
+
+                  if (!scenarioMap[name] || hasFail) {
+                      let testCaseID = "";
+                      const tags = Array.from(node.querySelectorAll('.category, .tag, a[href^="#"]'))
+                          .map(el => el.innerText.trim())
+                          .filter(t => /^@\d+$/.test(t));
+                      const uniqueTags = [...new Set(tags)];
+                      if (uniqueTags.length > 0) {
+                          testCaseID = uniqueTags.map(t => t.replace('@', '')).join(', ');
+                      }
+
+                      scenarioMap[name] = {
+                          status: hasFail ? 'Fail' : 'Pass',
+                          testCaseID: testCaseID
+                      };
+                  }
+              }
+          });
+      } else {
+          // Spark Report
+          const scenarios = doc.querySelectorAll('.node');
+          scenarios.forEach(node => {
+              let name = "";
+              const clone = node.cloneNode(true);
+              clone.querySelectorAll('.badge, .status, .timestamp, .tag').forEach(el => el.remove());
+              name = clone.innerText.trim();
+              name = name.split(/\s+/).filter(word => !word.startsWith('@')).join(' ').trim();
+
+              if (name) {
+                  name = name.replace(/Scenario Outline:|Scenario:|Test Case:/gi, "").trim();
+                  const hasFail = node.querySelector('.fail-bg, .status.fail, .badge.fail-bg') !== null ||
+                      (node.getAttribute('status') || '').toLowerCase().includes('fail');
+
+                  if (!scenarioMap[name] || hasFail) {
+                      scenarioMap[name] = {
+                          status: hasFail ? 'Fail' : 'Pass',
+                          testCaseID: "" // Spark usually doesn't need this in comparison per req
+                      };
+                  }
+              }
+          });
+
+          // Fallback for non-BDD Spark reports or if no .node found
+          if (Object.keys(scenarioMap).length === 0) {
+              const fallbackItems = doc.querySelectorAll('.test-item, .card');
+              fallbackItems.forEach(node => {
+                  let name = "";
+                  const nameElem = node.querySelector('.node-name, .test-name, .card-header, .name');
+                  if (nameElem) {
+                      const clone = nameElem.cloneNode(true);
+                      clone.querySelectorAll('.badge, .status, .timestamp, .tag').forEach(el => el.remove());
+                      name = clone.innerText.trim();
+                      name = name.split(/\s+/).filter(word => !word.startsWith('@')).join(' ').trim();
+                  }
+
+                  if (name) {
+                      name = name.replace(/Scenario Outline:|Scenario:|Test Case:/gi, "").trim();
+                      const hasFail = node.querySelector('.fail-bg, .status.fail, .badge.fail-bg') !== null;
+                      if (!scenarioMap[name] || hasFail) {
+                          scenarioMap[name] = {
+                              status: hasFail ? 'Fail' : 'Pass',
+                              testCaseID: ""
+                          };
+                      }
+                  }
+              });
+          }
+      }
+      return { scenarioMap };
+  }
+
+  function displayComparisonResults(nameA, nameB, dataA, dataB) {
+      resultsArea.style.display = 'block';
+      dropArea.style.display = 'none';
+      document.getElementById('stickyFileName').style.display = 'block';
+      document.getElementById('analysisResults').style.display = 'none';
+      document.getElementById('comparisonResults').style.display = 'block';
+      document.getElementById('comparisonSummaryContainer').style.display = 'block';
+
+      document.getElementById('reportAName').innerText = nameA;
+      document.getElementById('reportBName').innerText = nameB;
+
+      const isExtent = currentReportType === 'EXTENT';
+      const comparisonThead = document.querySelector('#comparisonTable thead');
+      comparisonThead.classList.remove('table-dark'); // Remove dark header for soft styling
+      comparisonThead.innerHTML = `
+          <tr class="header-main-row">
+              ${isExtent ? '<th style="width: 15%;">Test Case ID</th>' : ''}
+              <th style="width: ${isExtent ? '45%' : '60%'};">Scenario Name</th>
+              <th class="text-center header-report-1" style="width: 20%;">Old Report Status (Report 1)</th>
+              <th class="text-center header-report-2" style="width: 20%;">New Report Status (Report 2)</th>
+          </tr>
+      `;
+
+      const comparisonTbody = document.querySelector('#comparisonTable tbody');
+      comparisonTbody.innerHTML = '';
+
+      const mapA = dataA.scenarioMap;
+      const mapB = dataB.scenarioMap;
+      const isFailureStatus = (s) => s === 'Fail' || s === 'Broken';
+
+      // Calculate Stats
+      let totalA = Object.keys(mapA).length;
+      let totalB = Object.keys(mapB).length;
+      let passA = 0, failA = 0, passB = 0, failB = 0;
+      let newPassNames = [], newFailNames = [];
+
+      Object.keys(mapA).forEach(name => {
+          if (mapA[name].status === 'Pass') passA++;
+          else if (isFailureStatus(mapA[name].status)) failA++;
+      });
+
+      Object.keys(mapB).forEach(name => {
+          const statusB = mapB[name].status;
+          const statusA = mapA[name] ? mapA[name].status : 'Not Present';
+
+          if (statusB === 'Pass') {
+              passB++;
+              if (statusA !== 'Pass') newPassNames.push(name);
+          } else if (isFailureStatus(statusB)) {
+              failB++;
+              if (!isFailureStatus(statusA)) newFailNames.push(name);
+          }
+      });
+
+      document.getElementById('totalA').innerText = totalA;
+      document.getElementById('totalB').innerText = totalB;
+      document.getElementById('passA').innerText = passA;
+      document.getElementById('passB').innerText = passB;
+      document.getElementById('failA').innerText = failA;
+      document.getElementById('failB').innerText = failB;
+
+      document.getElementById('statusChangedPassCount').innerText = `${newPassNames.length} Changed/New`;
+      document.getElementById('statusChangedFailCount').innerText = `${newFailNames.length} Changed/New`;
+
+      document.getElementById('commonPassCount').innerText = passB - newPassNames.length;
+      document.getElementById('commonFailCount').innerText = failB - newFailNames.length;
+
+      lastNewFailedScenarios = new Set(newFailNames);
+      const statusChangedFailLink = document.getElementById('statusChangedFailLink');
+      if (newFailNames.length > 0) {
+          statusChangedFailLink.onclick = () => showFilteredAnalysis(newFailNames);
+          statusChangedFailLink.style.pointerEvents = 'auto';
+          statusChangedFailLink.style.opacity = '1';
+      } else {
+          statusChangedFailLink.onclick = null;
+          statusChangedFailLink.style.pointerEvents = 'none';
+          statusChangedFailLink.style.opacity = '0.5';
+      }
+
+      const allScenarioNames = new Set([...Object.keys(mapA), ...Object.keys(mapB)]);
+
+      const sortedScenarios = Array.from(allScenarioNames).sort();
+
+      sortedScenarios.forEach(name => {
+          const dataObjA = mapA[name] || { status: 'Not Present', testCaseID: '' };
+          const dataObjB = mapB[name] || { status: 'Not Present', testCaseID: '' };
+
+          const statusA = dataObjA.status;
+          const statusB = dataObjB.status;
+          const testCaseID = dataObjA.testCaseID || dataObjB.testCaseID || "";
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+              ${isExtent ? `<td class="compare-id-cell">${testCaseID}</td>` : ''}
+              <td>${name}</td>
+              <td class="text-center">${getStatusBadge(statusA)}</td>
+              <td class="text-center">${getStatusBadge(statusB)}</td>
+          `;
+          comparisonTbody.appendChild(tr);
+      });
+
+      // Initialize Comparison DataTable with filtering
+      if ($.fn.DataTable.isDataTable('#comparisonTable')) {
+          $('#comparisonTable').DataTable().destroy();
+          $('#comparisonTable thead .filter-row').remove();
+      }
+
+      // Create filter row
+      const filterRow = $('<tr class="filter-row"></tr>');
+      $('#comparisonTable thead').append(filterRow);
+
+      $('#comparisonTable thead tr:first-child th').each(function (i) {
+          const title = $(this).text();
+          const cell = $('<th></th>').appendTo(filterRow);
+
+          if (title === 'Scenario Name' || title === 'Test Case ID') {
+              $('<input type="text" class="form-control form-control-sm" placeholder="Search ' + title + '" />')
+                  .appendTo(cell)
+                  .on('keyup change', function () {
+                      table.column(i).search(this.value).draw();
+                  });
+          } else {
+              const statusOptions = currentReportType === 'ALLURE_API'
+                  ? ['Pass', 'Fail', 'Broken', 'Skipped', 'Unknown', 'Not Present']
+                  : ['Pass', 'Fail', 'Not Present'];
+              const optionHtml = statusOptions.map(s => `<option value="${s}">${s}</option>`).join('');
+              const select = $(`<select class="form-select form-select-sm"><option value="">All Statuses</option>${optionHtml}</select>`)
+                  .appendTo(cell)
+                  .on('change', function () {
+                      const val = $.fn.dataTable.util.escapeRegex($(this).val());
+                      table.column(i).search(val ? '^' + val + '$' : '', true, false).draw();
+                  });
+          }
+      });
+
+      const table = $('#comparisonTable').DataTable({
+          pageLength: 25,
+          dom: '<"summary-controls"B>rt<"bottom"ip>',
+          orderCellsTop: true,
+          buttons: ['copy', 'csv', 'excel']
+      });
+  }
+
+  function getStatusBadge(status) {
+      if (status === 'Pass') return '<span class="status-badge-compare status-pass">Pass</span>';
+      if (status === 'Fail') return '<span class="status-badge-compare status-fail">Fail</span>';
+      if (status === 'Broken') return '<span class="status-badge-compare status-fail">Broken</span>';
+      if (status === 'Skipped') return '<span class="status-badge-compare status-not-present">Skipped</span>';
+      if (status === 'Unknown') return '<span class="status-badge-compare status-not-present">Unknown</span>';
+      return '<span class="status-badge-compare status-not-present">Not Present</span>';
+  }
+
+  function processFile(file) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+          const content = e.target.result;
+          document.getElementById('analysisResults').style.display = 'block';
+          document.getElementById('comparisonResults').style.display = 'none';
+          document.getElementById('comparisonSummaryContainer').style.display = 'none';
+          const backBtn = document.getElementById('backToCompareBtn');
+          if (backBtn) backBtn.style.display = 'none';
+          analyzeReport(content);
+      };
+      reader.readAsText(file);
+  }
+
+  function showFilteredAnalysis(names) {
+      document.getElementById('comparisonResults').style.display = 'none';
+      document.getElementById('comparisonSummaryContainer').style.display = 'none';
+      document.getElementById('analysisResults').style.display = 'block';
+
+      // Add a temporary back button if not present
+      let backBtn = document.getElementById('backToCompareBtn');
+      if (!backBtn) {
+          backBtn = document.createElement('button');
+          backBtn.id = 'backToCompareBtn';
+          backBtn.className = 'btn btn-outline-primary btn-sm mb-3';
+          backBtn.innerHTML = '<i class="fas fa-chevron-left me-1"></i> Back to Comparison';
+          backBtn.onclick = () => {
+              document.getElementById('analysisResults').style.display = 'none';
+              document.getElementById('comparisonResults').style.display = 'block';
+              document.getElementById('comparisonSummaryContainer').style.display = 'block';
+          };
+          document.getElementById('analysisResults').prepend(backBtn);
+      }
+      backBtn.style.display = 'block';
+
+      analyzeReport(lastComparisonReport2Content, new Set(names));
+  }
+
+  function decodeBase64Utf8(base64Str) {
+      try {
+          const binary = atob(base64Str);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          return new TextDecoder('utf-8').decode(bytes);
+      } catch (e) {
+          return '';
+      }
+  }
+
+  function escapeHtml(text) {
+      return (text || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+  }
+
+  function normalizeAllureStatus(status) {
+      const s = (status || '').toLowerCase();
+      if (s === 'failed' || s === 'broken' || s === 'passed' || s === 'skipped') return s;
+      return 'unknown';
+  }
+
+  function parseAllureEmbeddedEntries(htmlContent) {
+      const dataMap = {};
+      const jsonMap = {};
+      const regex = /d\('([^']+)'\s*,\s*'([^']*)'\)/g;
+      let match;
+
+      while ((match = regex.exec(htmlContent)) !== null) {
+          const path = match[1];
+          const b64 = match[2];
+          const decoded = decodeBase64Utf8(b64);
+          if (!decoded) continue;
+          dataMap[path] = decoded;
+          if (path.endsWith('.json')) {
+              try {
+                  jsonMap[path] = JSON.parse(decoded);
+              } catch (e) {
+                  // Some attachments are not JSON, ignore parse errors.
+              }
+          }
+      }
+      return { dataMap, jsonMap };
+  }
+
+  function flattenAllurePackages(rootNode) {
+      const leafTests = [];
+
+      function walk(node, parents) {
+          if (!node || typeof node !== 'object') return;
+          const children = Array.isArray(node.children) ? node.children : [];
+          const nextParents = (node.name && node.name !== 'packages') ? [...parents, node.name] : parents;
+
+          if (children.length > 0) {
+              children.forEach(child => walk(child, nextParents));
+              return;
+          }
+
+          if (node.uid) {
+              leafTests.push({
+                  uid: node.uid,
+                  testName: node.name || 'Unknown Test',
+                  packagePath: parents.join('.'),
+                  status: normalizeAllureStatus(node.status),
+                  duration: node.time && typeof node.time.duration === 'number' ? node.time.duration : 0,
+                  tags: Array.isArray(node.tags) ? node.tags : []
+              });
+          }
+      }
+
+      walk(rootNode, []);
+      return leafTests;
+  }
+
+  function collectAllureStepDetails(step, level, lines) {
+      if (!step) return;
+      const indent = '  '.repeat(level);
+      const stepStatus = normalizeAllureStatus(step.status);
+      lines.push(`${indent}- ${step.name || 'Unnamed step'} [${stepStatus}]`);
+
+      if (Array.isArray(step.parameters)) {
+          step.parameters.forEach(p => {
+              lines.push(`${indent}  ${p.name || 'param'}: ${String(p.value ?? '')}`);
+          });
+      }
+
+      if (Array.isArray(step.steps)) {
+          step.steps.forEach(child => collectAllureStepDetails(child, level + 1, lines));
+      }
+  }
+
+  function getAllureAttachmentText(attachment, dataMap) {
+      if (!attachment || !attachment.source) return '';
+      const sourcePath = attachment.source.startsWith('data/') ? attachment.source : `data/attachments/${attachment.source}`;
+      const raw = dataMap[sourcePath] || dataMap[attachment.source];
+      if (!raw) return '';
+
+      const type = (attachment.type || '').toLowerCase();
+      const isTextLike = !type || type.startsWith('text/') || type.includes('json') || type.includes('xml');
+      if (!isTextLike) return '';
+
+      return raw.length > 1500 ? raw.slice(0, 1500) + '\n...truncated...' : raw;
+  }
+
+  function extractAllureRequestData(testCaseData, dataMap) {
+      const lines = [];
+
+      if (Array.isArray(testCaseData.parameters) && testCaseData.parameters.length > 0) {
+          lines.push('Parameters:');
+          testCaseData.parameters.forEach(p => {
+              lines.push(`- ${p.name || 'param'}: ${String(p.value ?? '')}`);
+          });
+      }
+
+      if (Array.isArray(testCaseData.parameterValues) && testCaseData.parameterValues.length > 0) {
+          if (lines.length > 0) lines.push('');
+          lines.push('Parameter Values:');
+          testCaseData.parameterValues.forEach((v, idx) => lines.push(`- value${idx + 1}: ${String(v ?? '')}`));
+      }
+
+      if (Array.isArray(testCaseData.labels) && testCaseData.labels.length > 0) {
+          if (lines.length > 0) lines.push('');
+          lines.push('Labels:');
+          testCaseData.labels.forEach(l => lines.push(`- ${l.name || 'label'}: ${String(l.value ?? '')}`));
+      }
+
+      if (Array.isArray(testCaseData.steps) && testCaseData.steps.length > 0) {
+          if (lines.length > 0) lines.push('');
+          lines.push('Execution:');
+          testCaseData.steps.forEach(step => collectAllureStepDetails(step, 0, lines));
+      }
+
+      const allAttachments = [];
+      if (Array.isArray(testCaseData.attachments)) allAttachments.push(...testCaseData.attachments);
+      if (Array.isArray(testCaseData.steps)) {
+          const stack = [...testCaseData.steps];
+          while (stack.length > 0) {
+              const step = stack.pop();
+              if (Array.isArray(step.attachments)) allAttachments.push(...step.attachments);
+              if (Array.isArray(step.steps)) stack.push(...step.steps);
+          }
+      }
+
+      const attachmentTexts = allAttachments
+          .map(a => ({ name: a.name || a.source || 'attachment', text: getAllureAttachmentText(a, dataMap) }))
+          .filter(a => a.text);
+
+      if (attachmentTexts.length > 0) {
+          if (lines.length > 0) lines.push('');
+          lines.push('Attachments:');
+          attachmentTexts.slice(0, 3).forEach(a => {
+              lines.push(`- ${a.name}:`);
+              lines.push(a.text);
+          });
+      }
+
+      const extra = testCaseData.extra && typeof testCaseData.extra === 'object' ? testCaseData.extra : null;
+      if (extra) {
+          const extraPairs = Object.entries(extra).filter(([, v]) => typeof v !== 'object' || v === null);
+          if (extraPairs.length > 0) {
+              if (lines.length > 0) lines.push('');
+              lines.push('Extra:');
+              extraPairs.forEach(([k, v]) => lines.push(`- ${k}: ${String(v)}`));
+          }
+      }
+
+      if (testCaseData.statusMessage) {
+          if (lines.length > 0) lines.push('');
+          lines.push('Status Message:');
+          lines.push(String(testCaseData.statusMessage));
+      }
+
+      const finalText = lines.join('\n').trim();
+      return finalText || '-';
+  }
+
+  function getAllureStatusBadge(status) {
+      const s = normalizeAllureStatus(status);
+      if (s === 'failed') return '<span class="badge bg-danger">Failed</span>';
+      if (s === 'broken') return '<span class="badge bg-warning text-dark">Broken</span>';
+      if (s === 'passed') return '<span class="badge bg-success">Passed</span>';
+      if (s === 'skipped') return '<span class="badge bg-secondary">Skipped</span>';
+      return '<span class="badge bg-dark">Unknown</span>';
+  }
+
+  function setAllureLoading(isLoading) {
+      const loader = document.getElementById('allureLoading');
+      if (!loader) return;
+      loader.style.display = isLoading ? 'block' : 'none';
+  }
+
+  function showAllureDetail(index) {
+      const detail = allureCurrentViewDetails[index];
+      if (!detail) return;
+
+      document.getElementById('allureDetailTitle').innerText = detail.testName || 'Allure Test Details';
+      document.getElementById('allureDetailPackage').innerText = detail.packagePath || '-';
+      document.getElementById('allureDetailStatus').innerHTML = getAllureStatusBadge(detail.status);
+      document.getElementById('allureDetailDuration').innerText = `${detail.durationMs} ms`;
+      document.getElementById('allureDetailRequestData').textContent = detail.requestData || '-';
+      document.getElementById('allureDetailErrorData').textContent = detail.errorMessage || '-';
+
+      new bootstrap.Modal(document.getElementById('allureDetailModal')).show();
+  }
+
+  let allureCurrentStatusFilter = 'failed';
+
+  function renderAllureFailureDetails(statusFilter) {
+      const normalizedFilter = normalizeAllureStatus(statusFilter);
+      allureCurrentStatusFilter = normalizedFilter;
+      const details = allureApiDetails.filter(d => normalizeAllureStatus(d.status) === normalizedFilter);
+      allureCurrentViewDetails = details;
+
+      // Update active button state in summary table
+      document.querySelectorAll('#summaryTable .allure-view-btn').forEach(btn => {
+          btn.classList.remove('btn-primary');
+          btn.classList.add('btn-outline-primary');
+      });
+      const activeBtn = document.querySelector(`#summaryTable .allure-view-btn[data-status="${normalizedFilter}"]`);
+      if (activeBtn) {
+          activeBtn.classList.remove('btn-outline-primary');
+          activeBtn.classList.add('btn-primary');
+      }
+
+      // Update current view label
+      const viewLabel = document.getElementById('allureCurrentViewLabel');
+      if (viewLabel) {
+          const labelText = normalizedFilter.charAt(0).toUpperCase() + normalizedFilter.slice(1);
+          viewLabel.innerHTML = `Currently showing: ${getAllureStatusBadge(normalizedFilter)}`;
+      }
+
+      updateTableHeader();
+      const analysisTbody = document.querySelector('#analysisTable tbody');
+      analysisTbody.innerHTML = '';
+
+      details.forEach((d, idx) => {
+          const tr = document.createElement('tr');
+          tr.className = 'allure-row-clickable';
+          tr.onclick = () => showAllureDetail(idx);
+          const tagsHtml = (d.tags || []).filter(t => typeof t === 'string').length > 0
+              ? d.tags.filter(t => typeof t === 'string').map(t => `<span class="badge bg-info text-dark me-1">${escapeHtml(t)}</span>`).join('')
+              : '<span class="text-muted">-</span>';
+
+          const statusBadge = getAllureStatusBadge(d.status);
+          tr.innerHTML = `
+              <td>${escapeHtml(d.packagePath || '-')}</td>
+              <td><span class="scenario-pill">${escapeHtml(d.testName)}</span></td>
+              <td data-status="${escapeHtml(d.status)}">${statusBadge}</td>
+              <td>${d.durationMs} ms</td>
+              <td>${tagsHtml}</td>
+          `;
+          analysisTbody.appendChild(tr);
+      });
+
+      initAnalysisTable();
+      document.getElementById('analysisCount').innerText = details.length;
+
+      // Scroll to analysis table
+      const analysisSection = document.getElementById('analysisResults');
+      if (analysisSection) {
+          setTimeout(() => analysisSection.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+      }
+  }
+
+  function renderAllureFailureDetailsWithSpinner(statusFilter) {
+      setAllureLoading(true);
+      setTimeout(() => {
+          renderAllureFailureDetails(statusFilter);
+          setAllureLoading(false);
+      }, 120);
+  }
+
+  function displayAllureApiResults(allDetails, statusCounts) {
+      allureApiDetails = allDetails;
+      currentAnalysisData = { failures: allDetails, summaryMap: statusCounts };
+
+      resultsArea.style.display = 'block';
+      dropArea.style.display = 'none';
+      document.getElementById('stickyFileName').style.display = 'block';
+      document.getElementById('analysisResults').style.display = 'block';
+      document.getElementById('comparisonResults').style.display = 'none';
+      document.getElementById('comparisonSummaryContainer').style.display = 'none';
+      const allureFeatureTable = document.getElementById('featureTable');
+      if (allureFeatureTable) {
+          const featureTableSection = allureFeatureTable.closest('.row');
+          const featureTableHeading = featureTableSection?.previousElementSibling;
+          if (featureTableHeading) featureTableHeading.style.display = 'none';
+          if (featureTableSection) featureTableSection.style.display = 'none';
+      }
+
+      // Show current view label for Allure
+      const viewLabel = document.getElementById('allureCurrentViewLabel');
+      if (viewLabel) viewLabel.style.display = 'block';
+
+      const summaryHead = document.querySelector('#summaryTable thead');
+      summaryHead.innerHTML = '<tr><th>Status</th><th>Count</th><th>Action</th></tr>';
+
+      const summaryTbody = document.querySelector('#summaryTable tbody');
+      summaryTbody.innerHTML = '';
+
+      const orderedStatuses = ['failed', 'broken', 'skipped', 'passed', 'unknown'];
+      orderedStatuses.forEach(status => {
+          const count = statusCounts[status] || 0;
+          const tr = document.createElement('tr');
+          const label = status.charAt(0).toUpperCase() + status.slice(1);
+          const isDefault = status === 'failed';
+          tr.innerHTML = `
+              <td>${getAllureStatusBadge(status)}</td>
+              <td><span class="badge bg-primary rounded-pill">${count}</span></td>
+              <td><button class="btn btn-sm ${isDefault ? 'btn-primary' : 'btn-outline-primary'} allure-view-btn" data-status="${status}" onclick="renderAllureFailureDetailsWithSpinner('${status}')">View ${label}</button></td>
+          `;
+          summaryTbody.appendChild(tr);
+      });
+
+      initSummaryTable();
+      // Default drill-down opens Failed details as requested.
+      renderAllureFailureDetailsWithSpinner('failed');
+  }
+
+  function analyzeAllureApiReport(htmlContent, filterSet = null) {
+      const parsed = parseAllureEmbeddedEntries(htmlContent);
+      const packageTree = parsed.jsonMap['data/packages.json'];
+
+      if (!packageTree) {
+          alert('Could not parse Allure API report. Please upload a valid single-file Allure HTML report.');
+          return;
+      }
+
+      const leafTests = flattenAllurePackages(packageTree);
+      const testCaseMap = new Map();
+
+      Object.keys(parsed.jsonMap)
+          .filter(k => k.startsWith('data/test-cases/') && k.endsWith('.json'))
+          .forEach(k => {
+              const tc = parsed.jsonMap[k];
+              if (tc && tc.uid) testCaseMap.set(tc.uid, tc);
+          });
+
+      let allDetails = leafTests.map(leaf => {
+          const tc = testCaseMap.get(leaf.uid) || {};
+          const mergedTags = [...new Set([...(leaf.tags || []), ...(tc.tags || [])])];
+          const errorMessage = [tc.statusMessage || '', tc.statusTrace || ''].filter(Boolean).join('\n\n');
+
+          return {
+              packagePath: leaf.packagePath,
+              testName: tc.name || leaf.testName,
+              status: normalizeAllureStatus(tc.status || leaf.status),
+              durationMs: (tc.time && typeof tc.time.duration === 'number') ? tc.time.duration : (leaf.duration || 0),
+              tags: mergedTags,
+              requestData: extractAllureRequestData(tc, parsed.dataMap),
+              errorMessage
+          };
+      });
+
+      const statusCounts = { failed: 0, broken: 0, skipped: 0, passed: 0, unknown: 0 };
+      allDetails.forEach(d => {
+          const s = normalizeAllureStatus(d.status);
+          statusCounts[s] = (statusCounts[s] || 0) + 1;
+      });
+
+      if (filterSet && filterSet.size > 0) {
+          allDetails = allDetails.filter(d => {
+              const scenarioName = `${d.packagePath || 'root'} :: ${d.testName || 'Unknown Test'}`;
+              return filterSet.has(scenarioName);
+          });
+      }
+
+      displayAllureApiResults(allDetails, statusCounts);
+  }
+
+  function analyzeReport(htmlContent, filterSet = null) {
+      if (currentReportType === 'ALLURE_API') {
+          analyzeAllureApiReport(htmlContent, filterSet);
+          return;
+      }
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlContent, "text/html");
+
+      const failures = [];
+      const summaryCounts = {};
+
+      if (currentReportType === 'EXTENT') {
+          // Extent Report Parsing (Specialized for PepsiCo_Automation_Report_dr)
+          // 1. Identify all failed leaf nodes (actual failing steps)
+          // We restrict the search to #test-collection or .test-view to avoid picking up dashboard controls/filters
+          const searchRoot = doc.querySelector('#test-collection, .test-collection, #test-view, .test-view') || doc;
+          const allPossible = Array.from(searchRoot.querySelectorAll("li, .node, .test-item"));
+          const leafFailures = allPossible.filter(node => {
+              const status = (node.getAttribute('status') || '').toLowerCase();
+              const hasFailStatus = status === 'fail' || status === 'error';
+              const hasCancelPrefix = node.innerText.trim().toLowerCase().startsWith('cancel');
+              if (!(hasFailStatus || hasCancelPrefix)) return false;
+
+              // Filter out status badges or nodes that only contain a status label (junk nodes)
+              const plainText = node.innerText.trim().toLowerCase();
+              if (/^(fail|error|cancel|skip|pass|info)$/.test(plainText)) return false;
+
+              // Ensure it's a leaf node by checking if it contains other failed steps
+              const hasNestedFailure = Array.from(node.querySelectorAll("li, .node")).some(child => {
+                  const s = (child.getAttribute('status') || '').toLowerCase();
+                  return s === 'fail' || s === 'error' || child.innerText.trim().toLowerCase().startsWith('cancel');
+              });
+              return !hasNestedFailure;
+          });
+
+          const failureMap = new Map();
+
+          leafFailures.forEach(stepNode => {
+              // A. Scenario Container - Finding the actual Scenario node (not the Feature)
+              let sc = stepNode.closest(".node.scenario, .scenario, .bdd-test");
+              if (!sc || sc === stepNode) {
+                  // If no explicit scenario class, go to the nearest parent node/test-item that isn't the step itself
+                  sc = stepNode.parentElement ? stepNode.parentElement.closest(".node, .test-item") : null;
+              }
+              const scenarioContainer = sc || stepNode.closest(".test-item") || stepNode;
+              const key = scenarioContainer;
+
+              // Match Spark behavior: Only process the first failure per scenario/card
+              if (failureMap.has(key)) return;
+
+              let testCaseID = "";
+              let scenarioName = "Unknown Scenario";
+              let failedStepLine = "Unknown Step";
+              let errorMessage = "No detailed log found";
+              let failureImage = "";
+
+              // B. Get Test Case ID
+              if (scenarioContainer) {
+                  // Numeric tags like @1234567 are test case IDs. Collect all numeric tags.
+                  const tags = Array.from(scenarioContainer.querySelectorAll('.category, .tag, a[href^="#"]'))
+                      .map(el => el.innerText.trim())
+                      .filter(t => /^@\d+$/.test(t));
+
+
+
+                  // Deduplicate and join
+                  const uniqueTags = [...new Set(tags)];
+                  if (uniqueTags.length > 0) {
+                      testCaseID = uniqueTags.map(t => t.replace('@', '')).join(', ');
+                  }
+              }
+
+              // C. Get Scenario Name
+              if (scenarioContainer) {
+                  // Prioritize elements that specifically indicate a scenario (likely to be in the scenario header)
+                  const nameElem = scenarioContainer.querySelector(".scenario-name, .scenario-heading, .status-p");
+                  if (nameElem && nameElem.innerText.trim()) {
+                      scenarioName = nameElem.innerText;
+                  } else {
+                      // Fallback to general names, but try to avoid the name of the step itself
+                      const possibleNames = Array.from(scenarioContainer.querySelectorAll(".test-name, .name, .step-name"));
+                      const bestName = possibleNames.find(el => el.innerText.trim().toLowerCase().includes("scenario:")) || possibleNames[0];
+                      if (bestName) {
+                          scenarioName = bestName.innerText;
+                      } else {
+                          scenarioName = (scenarioContainer.getAttribute("title") || scenarioContainer.getAttribute("name") || scenarioName);
+                      }
+                  }
+                  // Cleanup
+                  scenarioName = scenarioName.replace(/Scenario Outline:|Scenario:|Test Case:/gi, "").trim().replace(/^cancel\s*/i, "");
+              }
+
+              // C. Failed Step Line - Extract from the current step node
+              const stepNameElem = stepNode.querySelector(".step-name, .name, h6");
+              if (stepNameElem) {
+                  failedStepLine = stepNameElem.innerText.trim().replace(/^cancel\s*/i, "");
+              } else {
+                  const clone = stepNode.cloneNode(true);
+                  const toRemove = clone.querySelectorAll('textarea, .status, .screenshots, i, script, style');
+                  toRemove.forEach(el => el.remove());
+                  failedStepLine = clone.innerText.trim().replace(/^cancel\s*/i, "");
+              }
+
+              // D. Error Message
+              const codeBlock = stepNode.querySelector('textarea.code-block, .code-block, .details, .step-details');
+              if (codeBlock) {
+                  errorMessage = codeBlock.value || codeBlock.innerText;
+              }
+
+              // E. Failure Image
+              const context = scenarioContainer || stepNode;
+              const screenshotLinks = context.querySelectorAll(".screenshots a[href^='data:image'], .screenshots img[src^='data:image'], a[href^='data:image'], img[src^='data:image']");
+              if (screenshotLinks.length > 0) {
+                  failureImage = screenshotLinks[screenshotLinks.length - 1].getAttribute("href") || screenshotLinks[screenshotLinks.length - 1].getAttribute("src");
+              }
+
+              // F. Validation: Skip if we couldn't resolve a valid scenario name
+              // This prevents "Unknown Scenario" entries from inflating the failure count.
+              if (scenarioName === "Unknown Scenario") return;
+
+              failureMap.set(key, {
+                  testCaseID,
+                  scenarioName,
+                  failedStepLine,
+                  errorMessage,
+                  failureImage,
+                  videoUrl: "", // No video for Extent Reports
+                  featureName: ""
+              });
+          });
+
+          // 3. Finalize results from Map
+          failureMap.forEach(f => {
+              if (filterSet && !filterSet.has(f.scenarioName)) return;
+              failures.push(f);
+              const stepLine = f.failedStepLine || "Unknown Step";
+              const summaryKey = (f.featureName ? f.featureName + '|||' : '') + stepLine;
+              summaryCounts[summaryKey] = (summaryCounts[summaryKey] || 0) + 1;
+          });
+      } else {
+          // Original Spark/Generic parsing
+          const scenarios = doc.querySelectorAll('.card');
+
+          scenarios.forEach(card => {
+              const failBadge = card.querySelector('.badge.fail-bg') || card.querySelector('.badge.log.fail-bg') || card.querySelector('.status.danger');
+              const hasFailedStep = card.querySelector('.step.fail-bg');
+
+              if (failBadge || hasFailedStep) {
+                  let scenarioName = "Unknown Scenario";
+                  const nodeDiv = card.querySelector('.node') || card.querySelector('.node-name, .test-name, .card-header');
+                  if (nodeDiv) {
+                      const clone = nodeDiv.cloneNode(true);
+                      clone.querySelectorAll('.badge, .status, .timestamp, .tag').forEach(el => el.remove());
+                      scenarioName = clone.innerText.trim();
+                      // Strip out tags starting with @
+                      scenarioName = scenarioName.split(/\s+/).filter(word => !word.startsWith('@')).join(' ').trim();
+                  } else {
+                      const header = card.querySelector('.card-header');
+                      if (header) {
+                          scenarioName = header.innerText.trim();
+                          scenarioName = scenarioName.split(/\s+/).filter(word => !word.startsWith('@')).join(' ').trim();
+                      }
+                  }
+                  scenarioName = scenarioName.replace(/Scenario Outline:|Scenario:|Test Case:/gi, "").trim();
+                  if (!scenarioName) scenarioName = "Unknown Scenario";
+
+                  let failedStepLine = "";
+                  let errorMessage = "";
+
+                  const failedStep = card.querySelector('.step.fail-bg');
+                  if (failedStep) {
+                      const stepTextSpan = failedStep.querySelector('span');
+                      if (stepTextSpan) failedStepLine = stepTextSpan.innerText.trim();
+
+                      const textArea = failedStep.querySelector('textarea');
+                      if (textArea) errorMessage = textArea.value || textArea.innerText;
+                      else {
+                          const errDiv = failedStep.nextElementSibling;
+                          if (errDiv && (errDiv.classList.contains('message') || errDiv.innerHTML.includes('Exception'))) {
+                              errorMessage = errDiv.innerText;
+                          } else {
+                              errorMessage = failedStep.innerText.split('\n').filter(l => !l.includes(failedStepLine)).join('\n');
+                          }
+                      }
+                  }
+
+                  let failureImage = "";
+                  let videoUrl = "";
+                  let testCaseID = "";
+
+                  // Look for test case ID in tags for Spark
+                  const tags = Array.from(card.querySelectorAll('.category, .tag'))
+                      .map(el => el.innerText.trim())
+                      .filter(t => /^@\d+$/.test(t));
+                  if (tags.length > 0) {
+                      testCaseID = tags.map(t => t.replace('@', '')).join(', ');
+                  }
+
+                  const videoRefMatch = card.innerHTML.match(/(?:BrowserStack|LambdaTest) Session Video:<\/b>\s*<a href=[\'\"](.*?)[\'\"]/i);
+                  if (videoRefMatch) {
+                      videoUrl = videoRefMatch[1];
+                  }
+
+                  const base64Links = Array.from(card.querySelectorAll('a[href^="data:image"]'));
+                  if (base64Links.length > 0) {
+                      failureImage = base64Links[base64Links.length - 1].getAttribute('href');
+                  } else {
+                      const imgTags = Array.from(card.querySelectorAll('img[src^="data:image"]'));
+                      if (imgTags.length > 0) {
+                          failureImage = imgTags[imgTags.length - 1].getAttribute('src');
+                      }
+                  }
+
+                  if (failedStepLine) {
+                  const scenarioObj = {
+                      testCaseID,
+                      scenarioName,
+                      failedStepLine,
+                      errorMessage,
+                      failureImage,
+                      videoUrl,
+                      featureName: card.closest('.test-contents')?.querySelector('h5.test-status')?.innerText?.trim() || ''
+                  };
+                  if (filterSet && !filterSet.has(scenarioName)) return;
+                  failures.push(scenarioObj);
+
+                  const summaryKey = (scenarioObj.featureName ? scenarioObj.featureName + '|||' : '') + failedStepLine;
+                  if (!summaryCounts[summaryKey]) {
+                      summaryCounts[summaryKey] = 0;
+                  }
+                  summaryCounts[summaryKey]++;
+                  }
+              }
+          });
+      }
+
+      displayResults(failures, summaryCounts);
+  }
+
+  let currentAnalysisData = null;
+
+  function displayResults(failures, summaryMap) {
+      const stepSummaryMap = {};
+      const featureSummaryMap = {};
+
+      failures.forEach(f => {
+          const stepLine = f.failedStepLine || 'Unknown Step';
+          stepSummaryMap[stepLine] = (stepSummaryMap[stepLine] || 0) + 1;
+
+          const featureName = (f.featureName || '').trim() || '—';
+          featureSummaryMap[featureName] = (featureSummaryMap[featureName] || 0) + 1;
+      });
+
+      currentAnalysisData = { failures, summaryMap: stepSummaryMap, featureSummaryMap };
+      resultsArea.style.display = 'block';
+      dropArea.style.display = 'none';
+      document.getElementById('stickyFileName').style.display = 'block';
+      const featureTable = document.getElementById('featureTable');
+      if (featureTable) {
+          const featureTableSection = featureTable.closest('.row');
+          const featureTableHeading = featureTableSection?.previousElementSibling;
+          if (featureTableHeading) featureTableHeading.style.display = 'flex';
+          if (featureTableSection) featureTableSection.style.display = 'flex';
+      }
+
+      // 1. Populate Analysis Table
+      const analysisTbody = document.querySelector('#analysisTable tbody');
+      analysisTbody.innerHTML = '';
+
+      failures.forEach(f => {
+          const tr = document.createElement('tr');
+
+          // Image & Video cell
+          let mediaHtml = '';
+          if (f.failureImage) {
+              mediaHtml += `<div class="mb-2"><img src="${f.failureImage}" class="failure-img" onclick="showImage('${f.failureImage}')" title="Click to enlarge"></div>`;
+          }
+          if (f.videoUrl) {
+              mediaHtml += `<a href="${f.videoUrl}" target="_blank" class="btn btn-outline-danger btn-sm w-100 mt-1" style="font-size: 0.7rem; border-radius: 8px;">
+                              <i class="fa fa-play-circle me-1"></i> View Video
+                            </a>`;
+          }
+          if (!mediaHtml) mediaHtml = '<span class="text-muted">No Media</span>';
+
+          // Error cell
+          // Truncate if too long
+          const shortError = f.errorMessage.length > 300 ? f.errorMessage.substring(0, 300) + '...' : f.errorMessage;
+
+          // Conditionally include Test Case ID column based on report type
+          if (currentReportType === 'EXTENT') {
+              tr.innerHTML = `
+                  <td class="test-case-id">${f.testCaseID}</td>
+                  <td class="scenario-name"><span class="scenario-pill">${f.scenarioName}</span></td>
+                  <td class="step-line">${f.failedStepLine}</td>
+                  <td><div class="error-msg" title="${f.errorMessage.replace(/"/g, '&quot;')}">${shortError}</div></td>
+                  <td class="text-center">${mediaHtml}</td>
+                  <td class="text-center">
+                      <button class="btn btn-sm btn-primary analyze-btn"
+                              data-scenario="${f.scenarioName.replace(/"/g, '&quot;')}"
+                              data-step="${f.failedStepLine.replace(/"/g, '&quot;')}"
+                              data-error="${f.errorMessage.replace(/"/g, '&quot;')}"
+                              data-image="${f.failureImage || ''}"
+                              data-video="${f.videoUrl || ''}"
+                              data-testid="${f.testCaseID}">
+                          <i class="fas fa-brain"></i> Analyze
+                      </button>
+                  </td>
+              `;
+          } else {
+              tr.innerHTML = `
+                  <td class="scenario-name"><span class="scenario-pill">${f.scenarioName}</span></td>
+                  <td class="step-line">${f.failedStepLine}</td>
+                  <td><div class="error-msg" title="${f.errorMessage.replace(/"/g, '&quot;')}">${shortError}</div></td>
+                  <td class="text-center">${mediaHtml}</td>
+                  <td class="text-center">
+                      <button class="btn btn-sm btn-primary analyze-btn"
+                              data-scenario="${f.scenarioName.replace(/"/g, '&quot;')}"
+                              data-step="${f.failedStepLine.replace(/"/g, '&quot;')}"
+                              data-error="${f.errorMessage.replace(/"/g, '&quot;')}"
+                              data-image="${f.failureImage || ''}"
+                              data-video="${f.videoUrl || ''}">
+                          <i class="fas fa-brain"></i> Analyze
+                      </button>
+                  </td>
+              `;
+          }
+
+          // Attach event listener to the analyze button
+          const analyzeBtn = tr.querySelector('.analyze-btn');
+          if (analyzeBtn) {
+              analyzeBtn.addEventListener('click', function() {
+                  analyzeFailure(this);
+              });
+          }
+
+          analysisTbody.appendChild(tr);
+      });
+
+      // 2. Populate Summary Table
+      const summaryTbody = document.querySelector('#summaryTable tbody');
+      summaryTbody.innerHTML = '';
+      Object.keys(stepSummaryMap).forEach(stepPart => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+          <td class="step-line">${stepPart}</td>
+          <td><span class="badge bg-danger rounded-pill">${stepSummaryMap[stepPart]}</span></td>
+      `;
+          summaryTbody.appendChild(tr);
+      });
+
+      // 3. Populate Feature Summary Table
+      const featureTbody = document.querySelector('#featureTable tbody');
+      featureTbody.innerHTML = '';
+      Object.keys(featureSummaryMap).forEach(featureName => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+          <td>${featureName === '—' ? '<span class="text-muted small">—</span>' : `<span class="feature-pill">${featureName}</span>`}</td>
+          <td><span class="badge bg-primary rounded-pill">${featureSummaryMap[featureName]}</span></td>
+      `;
+          featureTbody.appendChild(tr);
+      });
+
+      // Update table header based on report type
+      updateTableHeader();
+
+      // Initialize DataTables
+      initAnalysisTable();
+      initSummaryTable();
+    initFeatureTable();
+
+      // Update initial count
+      document.getElementById('analysisCount').innerText = failures.length;
+  }
+
+  function updateTableHeader() {
+      const thead = document.querySelector('#analysisTable thead');
+      if (currentReportType === 'ALLURE_API') {
+          thead.innerHTML = `
+              <tr>
+                  <th>Package</th>
+                  <th>Test Name</th>
+                  <th>Status</th>
+                  <th>Duration</th>
+                  <th>Tags</th>
+                  <th>Actions</th>
+              </tr>
+          `;
+      } else if (currentReportType === 'EXTENT') {
+          thead.innerHTML = `
+              <tr>
+                  <th>Test Case ID</th>
+                  <th>Scenario Name</th>
+                  <th>Failed Step Line</th>
+                  <th>Error Message</th>
+                  <th>Failure Media</th>
+                  <th>Actions</th>
+              </tr>
+          `;
+      } else {
+          thead.innerHTML = `
+              <tr>
+                  <th>Scenario Name</th>
+                  <th>Failed Step Line</th>
+                  <th>Error Message</th>
+                  <th>Failure Media</th>
+                  <th>Actions</th>
+              </tr>
+          `;
+      }
+  }
+
+  function initAnalysisTable() {
+      // Destroy if exists
+      if ($.fn.DataTable.isDataTable('#analysisTable')) {
+          $('#analysisTable').DataTable().destroy();
+      }
+
+      // Setup - add a text input to each footer cell
+      $('#analysisTable thead tr')
+          .clone(true)
+          .addClass('filters')
+          .appendTo('#analysisTable thead');
+
+      // Configure columns based on report type
+      let columnDefs, exportColumns, mediaColumnIndex, actionsColumnIndex;
+      if (currentReportType === 'ALLURE_API') {
+          columnDefs = [
+              { width: '24%', targets: 0 },
+              { width: '30%', targets: 1 },
+              { width: '10%', targets: 2 },
+              { width: '10%', targets: 3 },
+              { width: '14%', targets: 4 },
+              { width: '12%', targets: 5, orderable: false }  // Actions
+          ];
+          exportColumns = [0, 1, 2, 3, 4];
+          mediaColumnIndex = -1;
+          actionsColumnIndex = 5;
+      } else if (currentReportType === 'EXTENT') {
+          columnDefs = [
+              { width: '8%', targets: 0 },  // Test Case ID
+              { width: '18%', targets: 1 }, // Scenario Name
+              { width: '28%', targets: 2 }, // Failed Step
+              { width: '32%', targets: 3 }, // Error Message
+              { width: '7%', targets: 4 },  // Failure Media
+              { width: '7%', targets: 5, orderable: false }   // Actions
+          ];
+          exportColumns = [0, 1, 2, 3];
+          mediaColumnIndex = 4;
+          actionsColumnIndex = 5;
+      } else {
+          columnDefs = [
+              { width: '23%', targets: 0 }, // Scenario Name
+              { width: '28%', targets: 1 }, // Failed Step
+              { width: '35%', targets: 2 }, // Error Message
+              { width: '7%', targets: 3 },  // Failure Media
+              { width: '7%', targets: 4, orderable: false }   // Actions
+          ];
+          exportColumns = [0, 1, 2];
+          mediaColumnIndex = 3;
+          actionsColumnIndex = 4;
+      }
+
+      const table = $('#analysisTable').DataTable({
+          orderCellsTop: true,
+          fixedHeader: true,
+          dom: 'Bfrtip',
+          autoWidth: false,
+          columnDefs: columnDefs,
+          buttons: [
+              {
+                  extend: 'csv',
+                  text: 'Download CSV',
+                  className: 'btn btn-success btn-sm',
+                  exportOptions: {
+                      columns: exportColumns
+                  }
+              },
+              {
+                  extend: 'excel',
+                  text: 'Download Excel',
+                  className: 'btn btn-primary btn-sm',
+                  exportOptions: {
+                      columns: exportColumns
+                  }
+              }
+          ],
+          initComplete: function () {
+              var api = this.api();
+
+              // Update count on first load
+              document.getElementById('analysisCount').innerText = api.rows({ filter: 'applied' }).count();
+
+              // For each column
+              api.columns().eq(0).each(function (colIdx) {
+                  // Skip Image column and Actions column (indices vary by report type)
+                  if (colIdx == mediaColumnIndex || colIdx == actionsColumnIndex) {
+                      var cell = $('.filters th').eq(
+                          $(api.column(colIdx).header()).index()
+                      );
+                      cell.html('');
+                      return;
+                  }
+
+                  var cell = $('.filters th').eq(
+                      $(api.column(colIdx).header()).index()
+                  );
+                  var headerText = $(api.column(colIdx).header()).text().trim();
+
+                  // For Allure API: STATUS column (col 2) uses a select dropdown
+                  if (currentReportType === 'ALLURE_API' && headerText === 'Status') {
+                      var select = $('<select class="form-select form-select-sm">' +
+                          '<option value="">All Statuses</option>' +
+                          '<option value="failed">Failed</option>' +
+                          '<option value="broken">Broken</option>' +
+                          '<option value="passed">Passed</option>' +
+                          '<option value="skipped">Skipped</option>' +
+                          '<option value="unknown">Unknown</option>' +
+                          '</select>');
+                      cell.html('').append(select);
+                      select.on('change', function () {
+                          var val = $(this).val();
+                          if (val) {
+                              // Capitalize first letter to match badge text (e.g. "failed" -> "Failed")
+                              var displayVal = val.charAt(0).toUpperCase() + val.slice(1);
+                              api.column(colIdx).search(
+                                  '^' + displayVal + '$',
+                                  true,  // regex
+                                  false  // smart
+                              ).draw();
+                          } else {
+                              api.column(colIdx).search('', false, false).draw();
+                          }
+                      });
+                      // Pre-select the currently active status filter
+                      if (allureCurrentStatusFilter) {
+                          select.val(allureCurrentStatusFilter);
+                      }
+                      return;
+                  }
+
+                  $(cell).html('<input type="text" placeholder="Filter..." />');
+
+                  // On every keypress in this input
+                  $(
+                      'input',
+                      $('.filters th').eq($(api.column(colIdx).header()).index())
+                  )
+                      .off('keyup change')
+                      .on('change', function (e) {
+                          // Get the search value
+                          $(this).attr('title', $(this).val());
+                          var regexr = '({search})';
+
+                          var cursorPosition = this.selectionStart;
+                          // Search the column for that value
+                          api
+                              .column(colIdx)
+                              .search(
+                                  this.value != ''
+                                      ? regexr.replace('{search}', '(((' + this.value + ')))')
+                                      : '',
+                                  this.value != '',
+                                  this.value == ''
+                              )
+                              .draw();
+                      })
+                      .on('keyup', function (e) {
+                          e.stopPropagation();
+                          $(this).trigger('change');
+                      });
+              });
+          }
+      });
+
+      // Update count when table is filtered
+      $('#analysisTable').on('draw.dt', function () {
+          var api = $('#analysisTable').DataTable();
+          document.getElementById('analysisCount').innerText = api.rows({ filter: 'applied' }).count();
+      });
+  }
+
+  function initSummaryTable() {
+      if ($.fn.DataTable.isDataTable('#summaryTable')) {
+          $('#summaryTable').DataTable().destroy();
+      }
+      const countSortIndex = 1;
+      $('#summaryTable').DataTable({
+          "order": [[countSortIndex, "desc"]], // Sort by count descending by default
+          dom: '<"summary-controls"Bf>rtip',
+          buttons: [
+              {
+                  extend: 'csv',
+                  text: 'Export Summary',
+                  className: 'btn btn-secondary btn-sm'
+              }
+          ]
+      });
+  }
+
+  function initFeatureTable() {
+      if (!document.getElementById('featureTable')) return;
+      if ($.fn.DataTable.isDataTable('#featureTable')) {
+          $('#featureTable').DataTable().destroy();
+      }
+
+      $('#featureTable').DataTable({
+          "order": [[1, "desc"]],
+          dom: '<"summary-controls"Bf>rtip',
+          buttons: [
+              {
+                  extend: 'csv',
+                  text: 'Export Feature Summary',
+                  className: 'btn btn-secondary btn-sm'
+              }
+          ]
+      });
+  }
+
+  window.showImage = function (src) {
+      document.getElementById('fullImage').src = src;
+      new bootstrap.Modal(document.getElementById('imageModal')).show();
+  }
+
+  window.downloadHtmlReport = function () {
+      if (!currentAnalysisData) {
+          alert("No data to download. Please process a file first.");
+          return;
+      }
+
+      if (currentReportType === 'ALLURE_API') {
+          alert('Download Full HTML for Allure API analysis will be added in a follow-up update.');
+          return;
+      }
+
+      const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Failure Analysis Report</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+<style>
+  body { padding: 30px; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); color: #1e293b; font-family: 'Outfit', sans-serif; min-height: 100vh; }
+  .container-fluid { max-width: 1400px; }
+  .failure-img {
+      max-width: 150px;
+      max-height: 100px;
+      cursor: pointer;
+      border: 2px solid #f1f5f9;
+      border-radius: 8px;
+      object-fit: cover;
+  }
+  #analysisTable { table-layout: fixed; width: 100% !important; }
+  .error-msg {
+      max-height: 250px;
+      min-height: 60px;
+      width: 100%;
+      max-width: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      resize: vertical;
+      font-size: 0.8rem;
+      font-family: 'Inter', monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+      background: #fff1f2;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      line-height: 1.5;
+      box-sizing: border-box;
+  }
+  .step-line { font-weight: 500; color: #e11d48; white-space: normal; word-wrap: break-word; word-break: break-word; display: block; width: 100%; }
+  .scenario-pill { display: inline-block; padding: 4px 12px; background-color: #eef2ff; color: #4338ca; border-radius: 20px; font-weight: 600; font-size: 0.85rem; border: 1px solid #e0e7ff; max-width: 100%; word-wrap: break-word; white-space: normal; }
+    .feature-pill { display: inline-block; padding: 3px 10px; background-color: #fdf4ff; color: #7e22ce; border-radius: 20px; font-weight: 600; font-size: 0.8rem; border: 1px solid #e9d5ff; max-width: 100%; word-wrap: break-word; white-space: normal; }
+    #summaryTable_wrapper, #featureTable_wrapper, #analysisTable_wrapper { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.05); border: 1px solid #f1f5f9; }
+  #summaryTable_wrapper { border-top: 4px solid #6366f1; }
+    #featureTable_wrapper { border-top: 4px solid #8b5cf6; }
+  #analysisTable_wrapper { border-top: 4px solid #3b82f6; }
+  h4 { margin-top: 40px; margin-bottom: 24px; color: #1e293b; padding-left: 0; font-weight: 700; font-size: 1.25rem; display: flex; align-items: center; }
+  .h4-accent { width: 4px; height: 24px; border-radius: 4px; margin-right: 12px; }
+  .bg-indigo { background-color: #6366f1; }
+  .bg-blue { background-color: #3b82f6; }
+  .table { border-collapse: separate; border-spacing: 0 8px; margin-top: -8px !important; }
+    #summaryTable thead th { background-color: #f5f3ff; color: #4338ca; }
+    #featureTable thead th { background-color: #f5f3ff; color: #6d28d9; }
+  #analysisTable thead th { background-color: #eff6ff; color: #1d4ed8; }
+  .table thead th { border: none; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; padding: 14px 16px; }
+  .table tbody tr { background-color: #fff; }
+  .table tbody tr td { border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; padding: 12px 16px; overflow: hidden; vertical-align: top; }
+  .table tbody tr td:first-child { border-left: 1px solid #f1f5f9; border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
+  .table tbody tr td:last-child { border-right: 1px solid #f1f5f9; border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
+  .modal-img { max-width: 100%; max-height: 80vh; object-fit: contain; border-radius: 12px; }
+  .modal-content { border: none; border-radius: 20px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); }
+  .modal-header { border-bottom: 1px solid #f1f5f9; background-color: #fff; padding: 20px 24px; }
+  thead input { width: 100%; padding: 8px 12px; box-sizing: border-box; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.8rem; }
+  .dt-buttons .btn { margin-right: 8px; border-radius: 10px; font-weight: 500; padding: 8px 16px; }
+  #analysisCount { font-size: 0.8rem; padding: 6px 12px; background-color: #3b82f6 !important; }
+    #summaryTable thead th:last-child, #summaryTable tbody td:last-child { text-align: right; padding-right: 24px; }
+    #featureTable thead th:last-child, #featureTable tbody td:last-child { text-align: right; padding-right: 24px; }
+</style>
+</head>
+<body>
+<div class="container-fluid">
+<div class="row mb-4 align-items-center">
+  <div class="col">
+      <h2><span style="color: #3b82f6;">Spark/Extent</span> Failure Analysis Report</h2>
+      <p class="text-muted">Generated on ${new Date().toLocaleString()}</p>
+  </div>
+</div>
+
+<div id="resultsArea" style="display: block;">
+  <h4><div class="h4-accent bg-indigo"></div>Failure Summary (Failed Steps)</h4>
+  <div class="row">
+      <div class="col-12">
+          <table id="summaryTable" class="table table-striped table-bordered" style="width:100%">
+              <thead><tr><th>Failed Step Line</th><th>Count</th></tr></thead>
+              <tbody></tbody>
+          </table>
+      </div>
+  </div>
+
+  <h4><div class="h4-accent bg-indigo"></div>Feature File Summary</h4>
+  <div class="row">
+      <div class="col-12">
+          <table id="featureTable" class="table table-striped table-bordered" style="width:100%">
+              <thead><tr><th>Feature File</th><th>Count</th></tr></thead>
+              <tbody></tbody>
+          </table>
+      </div>
+  </div>
+
+  <div class="d-flex justify-content-between align-items-center mt-5 mb-3">
+       <h4 class="mb-0"><div class="h4-accent bg-blue"></div>Failure Analysis Details <span id="analysisCount" class="badge bg-primary rounded-pill ms-2">0</span></h4>
+  </div>
+
+  <table id="analysisTable" class="table table-bordered" style="width:100%">
+      <thead><tr><th>Scenario Name</th><th>Failed Step Line</th><th>Error Message</th><th>Failure Media</th></tr></thead>
+      <tbody></tbody>
+  </table>
+</div>
+</div>
+
+<style>
+/* Consolidated controls box for generated report */
+.summary-controls {
+background: #f8fafc;
+padding: 16px;
+border-radius: 12px;
+border: 1px solid #e2e8f0;
+margin-bottom: 20px;
+display: flex;
+justify-content: space-between;
+align-items: center;
+}
+.summary-controls .dt-buttons, .summary-controls .dataTables_filter {
+display: flex !important;
+visibility: visible !important;
+opacity: 1 !important;
+margin: 0 !important;
+}
+.summary-controls .dt-buttons .btn {
+margin-right: 8px;
+opacity: 1 !important;
+visibility: visible !important;
+}
+</style>
+
+<!-- Image Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
+<div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Failure Screenshot</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body text-center"><img src="" class="modal-img" id="fullImage"></div></div></div>
+</div>
+
+<!-- AI Analysis Modal -->
+<div class="modal fade" id="aiAnalysisModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title"><i class="fas fa-brain me-2"></i>AI Failure Analysis</h5>
+        <button type="button" class="btn-close btn-close-white" onclick="closeAIAnalysisModal()" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="aiAnalysisLoading" class="text-center py-5" style="display: none;">
+          <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <h5 class="text-muted">Analyzing failure with AI...</h5>
+          <p class="text-muted small">This may take a few moments</p>
+        </div>
+        <div id="aiAnalysisContent" style="display: none;">
+          <!-- Quick Summary Banner -->
+          <div class="alert alert-light border mb-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h6 class="mb-1"><i class="fas fa-vial me-2 text-primary"></i><strong>Test Scenario:</strong> <span id="aiScenarioName"></span></h6>
+                <p class="mb-1 small"><strong>Failed Step:</strong> <span id="aiFailedStep" class="text-danger"></span></p>
+                <p class="mb-0 small text-muted"><strong>Error:</strong> <span id="aiError"></span></p>
+              </div>
+              <button class="btn btn-sm btn-outline-primary" onclick="copyAnalysisToClipboard()" title="Copy analysis to clipboard">
+                <i class="fas fa-copy me-1"></i>Copy Report
+              </button>
+            </div>
+          </div>
+
+          <!-- Classification and Confidence Row -->
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <div class="card border-primary h-100">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                  <span><i class="fas fa-tag me-2"></i>Classification</span>
+                  <span id="aiClassificationBadge" class="badge bg-light text-primary"></span>
+                </div>
+                <div class="card-body">
+                  <h5 id="aiClassification" class="text-primary mb-0"></h5>
+                  <div class="mt-2">
+                    <span id="classificationSourceLabel" class="badge bg-secondary"></span>
+                    <button type="button" id="changeClassificationBtn" class="btn btn-sm btn-outline-secondary ms-1" onclick="openClassificationEditor()">
+                      <i class="fas fa-pen me-1"></i>Change Classification
+                    </button>
+                  </div>
+                  <div id="classificationEditor" class="mt-2" style="display: none;">
+                    <select id="classificationSelect" class="form-select form-select-sm mb-2">
+                      <option value="AUTOMATION_ISSUE">AUTOMATION_ISSUE</option>
+                      <option value="APPLICATION_ISSUE">APPLICATION_ISSUE</option>
+                      <option value="API_ISSUE">API_ISSUE</option>
+                      <option value="DATA_ISSUE">DATA_ISSUE</option>
+                      <option value="ENVIRONMENT_ISSUE">ENVIRONMENT_ISSUE</option>
+                      <option value="NETWORK_ISSUE">NETWORK_ISSUE</option>
+                      <option value="UNKNOWN">UNKNOWN</option>
+                    </select>
+                    <div class="d-flex gap-2">
+                      <button type="button" class="btn btn-sm btn-primary" onclick="saveClassificationCorrection()">
+                        <i class="fas fa-check me-1"></i>Save
+                      </button>
+                      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="cancelClassificationEdit()">
+                        Cancel
+                      </button>
+                    </div>
+                    <div id="classificationSaveError" class="text-danger small mt-2" style="display: none;"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card border-warning h-100">
+                <div class="card-header bg-warning">
+                  <i class="fas fa-tachometer-alt me-2"></i>Confidence Level
+                </div>
+                <div class="card-body">
+                  <div class="progress mb-2" style="height: 25px;">
+                    <div id="aiConfidenceBar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                  </div>
+                  <div class="d-flex justify-content-between">
+                    <span id="aiConfidence" class="fw-bold"></span>
+                    <span id="aiConfidenceLabel" class="text-muted small"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card border-info h-100">
+                <div class="card-header bg-info text-white">
+                  <i class="fas fa-exclamation-triangle me-2"></i>Severity
+                </div>
+                <div class="card-body">
+                  <h5 id="aiSeverity" class="mb-0"></h5>
+                  <small id="aiSeverityDesc" class="text-muted"></small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Root Cause with expandable details -->
+          <div class="card border-danger mb-3">
+            <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+              <span><i class="fas fa-exclamation-circle me-2"></i>Root Cause Analysis</span>
+              <span id="aiRootCauseType" class="badge bg-light text-danger"></span>
+            </div>
+            <div class="card-body">
+              <p id="aiRootCause" class="mb-2"></p>
+              <div id="aiRootCauseDetails" class="mt-3" style="display: none;">
+                <hr>
+                <h6 class="fw-bold"><i class="fas fa-info-circle me-2"></i>Additional Context</h6>
+                <p id="aiRootCauseContext" class="mb-0 small"></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Screenshot Observations (if image provided) -->
+          <div id="aiScreenshotSection" class="card border-warning mb-3" style="display: none;">
+            <div class="card-header bg-warning">
+              <i class="fas fa-camera me-2"></i>Screenshot Analysis
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-8">
+                  <p id="aiScreenshotObservation" class="mb-0"></p>
+                </div>
+                <div class="col-md-4">
+                  <img id="aiScreenshotPreview" src="" class="img-fluid rounded border" alt="Failure screenshot" style="cursor: pointer; max-height: 150px;" onclick="showImage(this.src)">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Suggested Code Locations to Check -->
+          <div id="aiCodeLocationsSection" class="card border-info mb-3" style="display: none;">
+            <div class="card-header bg-info text-white">
+              <i class="fas fa-code me-2"></i>Suggested Code Locations to Check
+            </div>
+            <div class="card-body">
+              <div id="aiCodeLocations"></div>
+              <div class="alert alert-light border mt-3 mb-0">
+                <small class="text-muted">
+                  <i class="fas fa-lightbulb me-2"></i>
+                  <strong>Tip:</strong> These are AI-suggested locations based on the error pattern. Check these files and lines in your codebase.
+                </small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabbed Evidence and Details -->
+          <div class="card mb-3">
+            <div class="card-header bg-light">
+              <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link active" id="evidence-tab" data-bs-toggle="tab" data-bs-target="#evidence-content" type="button" role="tab">
+                    <i class="fas fa-clipboard-list me-1"></i>Evidence
+                  </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="action-tab" data-bs-toggle="tab" data-bs-target="#action-content" type="button" role="tab">
+                    <i class="fas fa-tools me-1"></i>Recommended Actions
+                  </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="reproduce-tab" data-bs-toggle="tab" data-bs-target="#reproduce-content" type="button" role="tab">
+                    <i class="fas fa-list-ol me-1"></i>Reproduce Steps
+                  </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="prevention-tab" data-bs-toggle="tab" data-bs-target="#prevention-content" type="button" role="tab">
+                    <i class="fas fa-shield-alt me-1"></i>Prevention Tips
+                  </button>
+                </li>
+              </ul>
+            </div>
+            <div class="card-body">
+              <div class="tab-content">
+                <!-- Evidence Tab -->
+                <div class="tab-pane fade show active" id="evidence-content" role="tabpanel">
+                  <ul id="aiEvidence" class="mb-0"></ul>
+                  <div id="aiMissingEvidence" class="mt-3" style="display: none;">
+                    <div class="alert alert-warning mb-0">
+                      <strong><i class="fas fa-exclamation-triangle me-2"></i>Missing Evidence:</strong>
+                      <ul id="aiMissingEvidenceList" class="mb-0 mt-2"></ul>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Action Tab -->
+                <div class="tab-pane fade" id="action-content" role="tabpanel">
+                  <div class="alert alert-success mb-3">
+                    <strong><i class="fas fa-lightbulb me-2"></i>Recommended Action:</strong>
+                    <p id="aiRecommendedAction" class="mb-0 mt-2"></p>
+                  </div>
+                  <div id="aiSuggestedFixSection" style="display: none;">
+                    <h6 class="fw-bold"><i class="fas fa-code me-2"></i>Suggested Fix:</h6>
+                    <div class="position-relative">
+                      <button class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 m-2" onclick="copyCodeToClipboard()" title="Copy code">
+                        <i class="fas fa-copy"></i>
+                      </button>
+                      <pre id="aiSuggestedFix" class="bg-dark text-light p-3 rounded" style="max-height: 300px; overflow-y: auto;"></pre>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Reproduce Tab -->
+                <div class="tab-pane fade" id="reproduce-content" role="tabpanel">
+                  <div id="aiStepsSection">
+                    <ol id="aiStepsToReproduce" class="mb-0"></ol>
+                  </div>
+                  <div id="aiNoSteps" style="display: none;">
+                    <p class="text-muted mb-0"><i class="fas fa-info-circle me-2"></i>No reproduction steps available</p>
+                  </div>
+                </div>
+
+                <!-- Prevention Tab -->
+                <div class="tab-pane fade" id="prevention-content" role="tabpanel">
+                  <div id="aiPreventionTips"></div>
+                  <div id="aiSimilarPatterns" class="mt-3" style="display: none;">
+                    <div class="alert alert-info mb-0">
+                      <strong><i class="fas fa-search me-2"></i>Similar Patterns Found:</strong>
+                      <p id="aiSimilarPatternsText" class="mb-0 mt-2 small"></p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div id="aiAnalysisError" class="alert alert-danger" role="alert" style="display: none;">
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          <span id="aiErrorMessage"></span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeAIAnalysisModal()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.0.js"><\/script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/js/bootstrap.bundle.min.js"><\/script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"><\/script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"><\/script>
+<script src="https://cdn.datatables.net/fixedheader/3.4.0/js/dataTables.fixedHeader.min.js"><\/script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"><\/script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"><\/script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"><\/script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"><\/script>
+
+<script>
+const embeddedData = ${JSON.stringify(currentAnalysisData)};
+const resultsArea = document.getElementById('resultsArea');
+
+$(document).ready(function() {
+  displayResults(embeddedData.failures, embeddedData.summaryMap);
+});
+
+${displayResults.toString()}
+${initAnalysisTable.toString()}
+function initSummaryTable() {
+  if ($.fn.DataTable.isDataTable('#summaryTable')) { $('#summaryTable').DataTable().destroy(); }
+  $('#summaryTable').DataTable({
+            "order": [[1, "desc"]],
+      dom: '<"summary-controls"Bf>rtip',
+      buttons: [
+          { extend: 'csv', text: 'Export Summary', className: 'btn btn-secondary btn-sm' }
+      ]
+  });
+}
+${initFeatureTable.toString()}
+
+window.showImage = function(src) {
+  document.getElementById('fullImage').src = src;
+  new bootstrap.Modal(document.getElementById('imageModal')).show();
+}
+<\/script>
+</body>
+</html>`;
+
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'FailureAnalysis_Report.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+  }
+</script>
+</body>
+
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>File Upload Test</title>
+</head>
+<body>
+    <h1>File Upload Test</h1>
+    <input type="file" id="testFileInput" accept=".html">
+    <div id="result"></div>
+
+    <script>
+        const fileInput = document.getElementById('testFileInput');
+        const result = document.getElementById('result');
+
+        console.log('Test page loaded');
+        console.log('File input element:', fileInput);
+
+        if (fileInput) {
+            fileInput.addEventListener('change', function(e) {
+                console.log('File selected!');
+                if (this.files && this.files.length > 0) {
+                    result.innerHTML = 'File selected: ' + this.files[0].name;
+                    console.log('File name:', this.files[0].name);
+                } else {
+                    result.innerHTML = 'No file selected';
+                }
+            });
+            console.log('Event listener attached');
+        } else {
+            console.error('File input not found!');
+        }
+    </script>
+</body>
+</html>
+

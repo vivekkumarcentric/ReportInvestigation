@@ -1,0 +1,89 @@
+[
+  {
+    "useNaturalConf": true,
+    "startTime": "Aug 23, 2026, 5:03:54 PM",
+    "endTime": "Aug 23, 2026, 5:08:36 PM",
+    "status": "PASS",
+    "level": 0,
+    "isLeaf": false,
+    "name": "Verify user registration flow with default language",
+    "description": "",
+    "bddType": "com.aventstack.extentreports.gherkin.model.Feature",
+    "children": [
+      {
+        "useNaturalConf": true,
+        "startTime": "Aug 23, 2026, 5:03:54 PM",
+        "endTime": "Aug 23, 2026, 5:08:36 PM",
+        "status": "PASS",
+        "level": 1,
+        "isLeaf": false,
+        "name": "verify complete user registration for peru with default language",
+        "description": "",
+        "bddType": "com.aventstack.extentreports.gherkin.model.Scenario"
+      }
+    ]
+  },
+  {
+    "useNaturalConf": true,
+    "startTime": "Aug 23, 2026, 5:03:54 PM",
+    "endTime": "Aug 23, 2026, 5:06:16 PM",
+    "status": "FAIL",
+    "level": 0,
+    "isLeaf": false,
+    "name": "Navigation of home menu buttons verification",
+    "description": "",
+    "bddType": "com.aventstack.extentreports.gherkin.model.Feature",
+    "children": [
+      {
+        "useNaturalConf": true,
+        "startTime": "Aug 23, 2026, 5:03:54 PM",
+        "endTime": "Aug 23, 2026, 5:06:16 PM",
+        "status": "FAIL",
+        "level": 1,
+        "isLeaf": false,
+        "name": "Verify the navigation menu for cedo users",
+        "description": "",
+        "bddType": "com.aventstack.extentreports.gherkin.model.Scenario",
+        "children": [
+          {
+            "useNaturalConf": true,
+            "startTime": "Aug 23, 2026, 5:06:09 PM",
+            "endTime": "Aug 23, 2026, 5:06:12 PM",
+            "status": "FAIL",
+            "level": 2,
+            "isLeaf": true,
+            "name": "Then user should see the following items in the right navigation menu for pepsico3.1",
+            "description": "com.pepsico.automation.b2b.stepdefinitions.ui.pepsiConnect.common.pep3_0.HomeSteps.userSeeRightNavigationMenu(io.cucumber.datatable.DataTable)",
+            "bddType": "com.aventstack.extentreports.gherkin.model.Then",
+            "logs": [
+              {
+                "timestamp": "Aug 23, 2026, 5:06:12 PM",
+                "status": "FAIL",
+                "details": "",
+                "seq": 1,
+                "exception": {
+                  "exception": {
+                    "detailMessage": "Element not found"
+                  },
+                  "stackTrace": "java.lang.AssertionError: Element not found\\n\\tat org.testng.Assert.fail(Assert.java:111)\\n\\tat com.pepsico.automation.b2b.stepdefinitions.ui.pepsiConnect.common.pep3_0.HomeSteps.userSeeRightNavigationMenu(HomeSteps.java:70)\\n\\tat ✽.user should see the following items in the right navigation menu for pepsico3.1(classpath:features/ui/pepsiConnect/gtc3.x/HomeMenuNavigation.feature:12)\\n",
+                  "name": "java.lang.AssertionError"
+                }
+              }
+            ],
+            "media": [],
+            "exceptions": [
+              {
+                "exception": {
+                  "detailMessage": "Element not found"
+                },
+                "stackTrace": "java.lang.AssertionError: Element not found\\n\\tat org.testng.Assert.fail(Assert.java:111)\\n\\tat com.pepsico.automation.b2b.stepdefinitions.ui.pepsiConnect.common.pep3_0.HomeSteps.userSeeRightNavigationMenu(HomeSteps.java:70)",
+                "name": "java.lang.AssertionError"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]
+

@@ -1,0 +1,1813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QA Test Intelligence Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --secondary: #7c3aed;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-500: #6b7280;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--gray-900);
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Dashboard Header */
+        .dashboard-header {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .dashboard-header h1 {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--gray-900);
+            margin: 0;
+        }
+
+        .dashboard-header p {
+            color: var(--gray-500);
+            margin: 0.5rem 0 0 0;
+        }
+
+        /* Upload Screen */
+        .upload-screen {
+            background: white;
+            border-radius: 16px;
+            padding: 3rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .upload-area {
+            border: 3px dashed var(--gray-300);
+            border-radius: 12px;
+            padding: 3rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: var(--gray-50);
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary);
+            background: #eff6ff;
+        }
+
+        .upload-area.file-selected {
+            border-color: var(--success);
+            background: #f0fdf4;
+        }
+
+        .upload-icon {
+            font-size: 4rem;
+            color: var(--gray-400);
+            margin-bottom: 1rem;
+        }
+
+        .upload-area.file-selected .upload-icon {
+            color: var(--success);
+        }
+
+        .file-info {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: white;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .file-info.show {
+            display: block;
+        }
+
+        /* Analysis Button */
+        .analyze-btn {
+            margin-top: 2rem;
+            padding: 1rem 3rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 12px;
+            background: var(--primary);
+            border: none;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .analyze-btn:hover:not(:disabled) {
+            background: #1d4ed8;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+        }
+
+        .analyze-btn:disabled {
+            background: var(--gray-300);
+            cursor: not-allowed;
+        }
+
+        /* Dashboard View */
+        .dashboard-view {
+            display: none;
+        }
+
+        .dashboard-view.show {
+            display: block;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--gray-900);
+        }
+
+        .stat-label {
+            color: var(--gray-500);
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-change {
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Charts */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .chart-card h3 {
+            font-size: 1.125rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--gray-900);
+        }
+
+        /* Failure Groups */
+        .failure-groups {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2rem;
+        }
+
+        .failure-groups h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: var(--gray-900);
+        }
+
+        .failure-group {
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+
+        .failure-group-header {
+            padding: 1rem;
+            background: var(--gray-50);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.2s ease;
+        }
+
+        .failure-group-header:hover {
+            background: var(--gray-100);
+        }
+
+        .failure-group-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex: 1;
+        }
+
+        .classification-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .classification-badge.bug {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .classification-badge.automation {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .classification-badge.data {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .classification-badge.environment {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+
+        .classification-badge.unknown {
+            background: var(--gray-200);
+            color: var(--gray-700);
+        }
+
+        .failure-count-badge {
+            background: var(--primary);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .failure-group-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .failure-group.expanded .failure-group-body {
+            max-height: 2000px;
+        }
+
+        .failure-group.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        .expand-icon {
+            transition: transform 0.3s ease;
+        }
+
+        .failure-details {
+            padding: 1.5rem;
+            border-top: 1px solid var(--gray-200);
+        }
+
+        .failure-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .failure-meta-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .failure-meta-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--gray-500);
+            margin-bottom: 0.25rem;
+        }
+
+        .failure-meta-value {
+            font-size: 0.875rem;
+            color: var(--gray-900);
+        }
+
+        .affected-tests {
+            margin-top: 1rem;
+        }
+
+        .affected-tests h4 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--gray-900);
+            margin-bottom: 0.5rem;
+        }
+
+        .test-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .test-list-item {
+            padding: 0.5rem;
+            background: var(--gray-50);
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        .mb-3 {
+            margin-bottom: 1.5rem;
+        }
+
+        .text-muted {
+            color: var(--gray-500);
+        }
+
+        .confidence-meter {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .confidence-bar {
+            flex: 1;
+            height: 8px;
+            background: var(--gray-200);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--warning), var(--success));
+            transition: width 0.3s ease;
+        }
+
+        /* Filters */
+        .filters-bar {
+            background: white;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            border: 2px solid var(--gray-300);
+            background: white;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .filter-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .filter-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        /* Loading */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .loading-overlay.show {
+            display: flex;
+        }
+
+        .loading-content {
+            background: white;
+            padding: 2rem 3rem;
+            border-radius: 16px;
+            text-align: center;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid var(--gray-200);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Utilities */
+        .hidden {
+            display: none !important;
+        }
+
+        .mt-2 { margin-top: 2rem; }
+        .mb-2 { margin-bottom: 2rem; }
+
+        /* Back Button */
+        .back-btn {
+            margin-bottom: 1rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            color: white;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Test list item as clickable card */
+        .test-list-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            cursor: pointer;
+        }
+
+        .test-list-item:hover {
+            background: var(--gray-100);
+        }
+
+        .test-list-item-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .view-details-btn {
+            flex-shrink: 0;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 6px;
+            border: none;
+            background: var(--primary);
+            color: white;
+            white-space: nowrap;
+        }
+
+        .view-details-btn:hover {
+            background: #1d4ed8;
+        }
+
+        /* Failure Detail Modal */
+        #failureDetailModal .modal-content {
+            border-radius: 16px;
+            overflow: hidden;
+            border: none;
+        }
+
+        #failureDetailModal .modal-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 1.5rem 2rem;
+        }
+
+        #failureDetailModal .modal-title {
+            font-weight: 700;
+            font-size: 1.25rem;
+        }
+
+        .modal-subtitle {
+            font-size: 0.875rem;
+            opacity: 0.9;
+            margin-top: 0.25rem;
+        }
+
+        #failureDetailModal .btn-close {
+            filter: invert(1) brightness(200%);
+        }
+
+        #failureDetailModal .modal-body {
+            padding: 1.5rem 2rem 2rem;
+        }
+
+        .failure-tabs {
+            border-bottom: 2px solid var(--gray-200);
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .failure-tabs .nav-link {
+            border: none;
+            color: var(--gray-500);
+            font-weight: 600;
+            font-size: 0.9rem;
+            padding: 0.75rem 1.1rem;
+            border-bottom: 3px solid transparent;
+            border-radius: 0;
+        }
+
+        .failure-tabs .nav-link i {
+            margin-right: 0.4rem;
+        }
+
+        .failure-tabs .nav-link:hover {
+            color: var(--primary);
+        }
+
+        .failure-tabs .nav-link.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            background: transparent;
+        }
+
+        .failure-tab-content {
+            min-height: 200px;
+        }
+
+        .tab-pane-body {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: var(--gray-800);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .screenshot-frame {
+            width: 100%;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--gray-200);
+            background: var(--gray-50);
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .screenshot-frame img {
+            max-width: 100%;
+            max-height: 480px;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .screenshot-missing {
+            padding: 3rem 1rem;
+            color: var(--gray-500);
+            text-align: center;
+        }
+
+        .screenshot-missing i {
+            font-size: 2.5rem;
+            display: block;
+            margin-bottom: 0.75rem;
+            color: var(--gray-300);
+        }
+
+        .modal-meta-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .modal-meta-chip {
+            background: var(--gray-50);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+        }
+
+        .modal-badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .video-link-box {
+            padding: 1rem;
+            background: var(--gray-50);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Upload Screen -->
+        <div id="uploadScreen" class="upload-screen">
+            <div class="dashboard-header">
+                <h1><i class="fas fa-chart-line"></i> QA Test Intelligence Dashboard</h1>
+                <p>Upload your test execution report to analyze failures and identify potential bugs</p>
+            </div>
+
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                </div>
+                <h3>Upload Test Report</h3>
+                <p class="text-muted">Drag and drop your JSON report here or click to browse</p>
+                <button type="button" class="btn btn-primary mt-3" id="browseBtn">
+                    <i class="fas fa-folder-open"></i> Browse JSON File
+                </button>
+                <input type="file" id="fileInput" accept=".json" style="display: none;">
+            </div>
+
+            <div class="file-info" id="fileInfo">
+                <h5 id="fileName">No file selected</h5>
+                <p class="text-muted" id="fileSize">0 KB</p>
+            </div>
+
+            <button class="analyze-btn" id="analyzeBtn" disabled>
+                <i class="fas fa-play-circle"></i> Analyze Report
+            </button>
+        </div>
+
+        <!-- Dashboard View -->
+        <div id="dashboardView" class="dashboard-view">
+            <a href="#" class="back-btn" id="backBtn">
+                <i class="fas fa-arrow-left"></i> Upload New Report
+            </a>
+
+            <div class="dashboard-header">
+                <h1><i class="fas fa-chart-line"></i> Test Analysis Results</h1>
+                <p id="reportName">Report Analysis</p>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <div>
+                            <div class="stat-label">Total Tests</div>
+                            <div class="stat-value" id="totalTests">0</div>
+                        </div>
+                        <div class="stat-icon" style="background: #eff6ff; color: var(--info);">
+                            <i class="fas fa-vial"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <div>
+                            <div class="stat-label">Passed</div>
+                            <div class="stat-value" id="passedTests" style="color: var(--success);">0</div>
+                        </div>
+                        <div class="stat-icon" style="background: #f0fdf4; color: var(--success);">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <div>
+                            <div class="stat-label">Failed</div>
+                            <div class="stat-value" id="failedTests" style="color: var(--danger);">0</div>
+                        </div>
+                        <div class="stat-icon" style="background: #fef2f2; color: var(--danger);">
+                            <i class="fas fa-times-circle"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <div>
+                            <div class="stat-label">Pass Rate</div>
+                            <div class="stat-value" id="passRate">0%</div>
+                        </div>
+                        <div class="stat-icon" style="background: #fef3c7; color: var(--warning);">
+                            <i class="fas fa-percentage"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <div>
+                            <div class="stat-label">Potential Bugs</div>
+                            <div class="stat-value" id="bugCount" style="color: var(--danger);">0</div>
+                        </div>
+                        <div class="stat-icon" style="background: #fef2f2; color: var(--danger);">
+                            <i class="fas fa-bug"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <div>
+                            <div class="stat-label">Automation Issues</div>
+                            <div class="stat-value" id="automationCount" style="color: var(--warning);">0</div>
+                        </div>
+                        <div class="stat-icon" style="background: #fef3c7; color: var(--warning);">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <div>
+                            <div class="stat-label">Data Issues</div>
+                            <div class="stat-value" id="dataCount" style="color: var(--info);">0</div>
+                        </div>
+                        <div class="stat-icon" style="background: #dbeafe; color: var(--info);">
+                            <i class="fas fa-database"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <div>
+                            <div class="stat-label">Environment Issues</div>
+                            <div class="stat-value" id="envCount" style="color: var(--secondary);">0</div>
+                        </div>
+                        <div class="stat-icon" style="background: #f3e8ff; color: var(--secondary);">
+                            <i class="fas fa-server"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>Test Results Distribution</h3>
+                    <canvas id="resultsChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Failure Classification</h3>
+                    <canvas id="classificationChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="filters-bar">
+                <button class="filter-btn active" data-filter="all">All Failures</button>
+                <button class="filter-btn" data-filter="bug">🔴 Potential Bugs</button>
+                <button class="filter-btn" data-filter="automation">🟠 Automation Issues</button>
+                <button class="filter-btn" data-filter="data">🟡 Data Issues</button>
+                <button class="filter-btn" data-filter="environment">🔵 Environment Issues</button>
+                <button class="filter-btn" data-filter="unknown">⚪ Unknown</button>
+            </div>
+
+            <!-- Failure Groups -->
+            <div class="failure-groups">
+                <h2>Failure Analysis</h2>
+                <div id="failureGroupsContainer">
+                    <!-- Failure groups will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <h4>Analyzing Report with AI...</h4>
+            <p class="text-muted" id="loadingProgress">Parsing JSON report...</p>
+        </div>
+    </div>
+
+    <!-- Failure Detail Modal -->
+    <div class="modal fade" id="failureDetailModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="failureModalTitle">Failure Details</h5>
+                        <div class="modal-subtitle" id="failureModalSubtitle"></div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs failure-tabs" id="failureModalTabs" role="tablist"></ul>
+                    <div class="tab-content failure-tab-content" id="failureModalTabContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap & jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Global state
+        let reportData = null;
+        let failureGroups = [];
+        let currentFilter = 'all';
+        let charts = { results: null, classification: null };
+        const failuresById = new Map();
+        let failureIdCounter = 0;
+        let failureModalInstance = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initUploadHandlers();
+            initBackButton();
+            initFilters();
+        });
+
+        function initUploadHandlers() {
+            const uploadArea = document.getElementById('uploadArea');
+            const browseBtn = document.getElementById('browseBtn');
+            const fileInput = document.getElementById('fileInput');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+
+            if (!uploadArea || !browseBtn || !fileInput || !analyzeBtn) return;
+
+            browseBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                fileInput.click();
+            });
+            uploadArea.addEventListener('click', (e) => {
+                if (e.target && e.target.closest('button')) return;
+                fileInput.click();
+            });
+            uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.style.borderColor = 'var(--primary)'; });
+            uploadArea.addEventListener('dragleave', () => { uploadArea.style.borderColor = ''; });
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.style.borderColor = '';
+                handleFileSelect(e.dataTransfer?.files?.[0]);
+            });
+            fileInput.addEventListener('change', (e) => handleFileSelect(e.target?.files?.[0]));
+            analyzeBtn.addEventListener('click', analyzeReport);
+        }
+
+        function handleFileSelect(file) {
+            if (!file) return;
+            if (!file.name.toLowerCase().endsWith('.json')) {
+                alert('Please select a JSON report file');
+                return;
+            }
+
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInfo = document.getElementById('fileInfo');
+            const fileNameEl = document.getElementById('fileName');
+            const fileSizeEl = document.getElementById('fileSize');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            if (!uploadArea || !fileInfo || !fileNameEl || !fileSizeEl || !analyzeBtn) return;
+
+            fileNameEl.textContent = file.name;
+            fileSizeEl.textContent = (file.size / 1024).toFixed(2) + ' KB';
+            uploadArea.classList.add('file-selected');
+            fileInfo.classList.add('show');
+            analyzeBtn.disabled = false;
+            window.selectedFile = file;
+            const fileInput = document.getElementById('fileInput');
+            if (fileInput) fileInput.value = '';
+        }
+
+        function initBackButton() {
+            document.getElementById('backBtn').addEventListener('click', (e) => {
+                e.preventDefault();
+                showUploadScreen();
+            });
+        }
+
+        function showUploadScreen() {
+            const uploadScreen = document.getElementById('uploadScreen');
+            const dashboardView = document.getElementById('dashboardView');
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInfo = document.getElementById('fileInfo');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            if (uploadScreen) uploadScreen.style.display = 'block';
+            if (dashboardView) dashboardView.classList.remove('show');
+            if (uploadArea) uploadArea.classList.remove('file-selected');
+            if (fileInfo) fileInfo.classList.remove('show');
+            if (analyzeBtn) analyzeBtn.disabled = true;
+            window.selectedFile = null;
+        }
+
+        async function analyzeReport() {
+            if (!window.selectedFile) {
+                alert('Please upload a JSON report first.');
+                return;
+            }
+            showLoading(true);
+            try {
+                const content = await readFileAsText(window.selectedFile);
+                const parsedData = parseReport(content);
+                reportData = await classifyFailures(parsedData);
+                document.getElementById('uploadScreen').style.display = 'none';
+                document.getElementById('dashboardView').classList.add('show');
+                renderDashboard();
+            } catch (error) {
+                console.error('Analysis error:', error);
+                alert('Error analyzing report: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function readFileAsText(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = reject;
+                reader.readAsText(file);
+            });
+        }
+
+        function showLoading(show) {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) overlay.classList.toggle('show', show);
+        }
+
+        function parseReport(jsonContent) {
+            let jsonData;
+            try {
+                jsonData = JSON.parse(jsonContent);
+            } catch (e) {
+                throw new Error('Invalid JSON file: ' + e.message);
+            }
+
+            const tests = [];
+            const failures = [];
+            if (Array.isArray(jsonData) && jsonData.length > 0 && jsonData[0].children) {
+                parseExtentReport(jsonData, tests, failures);
+            } else if (Array.isArray(jsonData)) {
+                parseTestArray(jsonData, tests, failures);
+            } else if (jsonData.tests || jsonData.testcases || jsonData.test_cases) {
+                parseTestArray(jsonData.tests || jsonData.testcases || jsonData.test_cases, tests, failures);
+            } else if (jsonData.results || jsonData.test_results) {
+                parseTestArray(jsonData.results || jsonData.test_results, tests, failures);
+            } else if (jsonData.suites || jsonData.testsuites) {
+                parseSuites(jsonData.suites || jsonData.testsuites, tests, failures);
+            } else {
+                const testCase = parseTestCase(jsonData);
+                if (testCase) {
+                    tests.push(testCase);
+                    if (testCase.status === 'fail') failures.push(testCase);
+                }
+            }
+
+            if (tests.length === 0) throw new Error('No test cases found in JSON. Please check the file format.');
+            return { tests, failures, fileName: (window.selectedFile && window.selectedFile.name) ? window.selectedFile.name : 'Uploaded Report' };
+        }
+
+        function parseExtentReport(features, tests, failures) {
+            features.forEach(feature => {
+                const featureName = feature.name || 'Unknown Feature';
+                if (!Array.isArray(feature.children)) return;
+                feature.children.forEach(scenario => {
+                    const scenarioName = scenario.name || 'Unknown Scenario';
+                    const scenarioStatus = (scenario.status || '').toUpperCase();
+                    const allSteps = [];
+                    let failedStep = null;
+                    let errorMessage = null;
+                    let failedIndex = -1;
+                    if (Array.isArray(scenario.children)) {
+                        scenario.children.forEach((step, index) => {
+                            const stepStatus = step.status || 'UNKNOWN';
+                            const stepName = step.name || 'Unknown step';
+                            const stepText = `${index + 1}. [${stepStatus}] ${stepName}`;
+                            allSteps.push(stepText);
+                            if (stepStatus === 'FAIL' && !failedStep) {
+                                failedStep = stepName;
+                                errorMessage = extractErrorFromNode(step) || 'Error details not available';
+                                failedIndex = index;
+                            }
+                        });
+                    }
+                    const screenshot = findScreenshotInScenario(scenario.children, failedIndex);
+                    const videoUrl = findVideoInScenario(scenario.children, failedIndex);
+                    const testCase = {
+                        name: scenarioName,
+                        status: scenarioStatus === 'PASS' ? 'pass' : scenarioStatus === 'FAIL' ? 'fail' : scenarioStatus === 'SKIP' ? 'skip' : 'unknown',
+                        failedStep,
+                        error: errorMessage,
+                        screenshot,
+                        videoUrl,
+                        feature: featureName,
+                        testCaseId: '',
+                        allSteps,
+                        _raw: scenario
+                    };
+                    tests.push(testCase);
+                    if (testCase.status === 'fail') failures.push(testCase);
+                });
+            });
+        }
+
+        function extractErrorFromNode(step) {
+            const failLog = Array.isArray(step.logs) ? step.logs.find(log => (log.status || '').toUpperCase() === 'FAIL') : null;
+            if (failLog?.exception?.stackTrace) return failLog.exception.stackTrace;
+            if (failLog?.exception?.exception?.detailMessage) return failLog.exception.exception.detailMessage;
+            if (Array.isArray(step.exceptions) && step.exceptions.length > 0) {
+                const exc = step.exceptions[0];
+                return exc?.stackTrace || exc?.exception?.detailMessage || null;
+            }
+            return null;
+        }
+
+        // Extracts a base64/path screenshot from a single step node, checking both
+        // step.media (array, used by some steps) and each log entry's media (object,
+        // commonly used by ExtentReports for hook-level attachments like afterScenario).
+        function extractScreenshotFromStepNode(step) {
+            if (!step) return null;
+            if (Array.isArray(step.media) && step.media.length > 0) {
+                const found = step.media.find(m => m && (m.base64 || m.path));
+                if (found) return found.base64 || found.path;
+            }
+            if (Array.isArray(step.logs)) {
+                for (const log of step.logs) {
+                    const media = log && log.media;
+                    if (!media) continue;
+                    if (Array.isArray(media)) {
+                        const found = media.find(m => m && (m.base64 || m.path));
+                        if (found) return found.base64 || found.path;
+                    } else if (media.base64 || media.path) {
+                        return media.base64 || media.path;
+                    }
+                }
+            }
+            return null;
+        }
+
+        // Searches the whole scenario for a screenshot, preferring the failed step itself,
+        // then any step AFTER it (e.g. the afterScenario hook, where ExtentReports typically
+        // attaches the failure screenshot), then finally any step in the scenario.
+        function findScreenshotInScenario(children, failedIndex) {
+            if (!Array.isArray(children) || children.length === 0) return null;
+            if (failedIndex >= 0) {
+                const direct = extractScreenshotFromStepNode(children[failedIndex]);
+                if (direct) return direct;
+            }
+            for (let i = (failedIndex >= 0 ? failedIndex + 1 : 0); i < children.length; i++) {
+                const found = extractScreenshotFromStepNode(children[i]);
+                if (found) return found;
+            }
+            for (let i = 0; i < (failedIndex >= 0 ? failedIndex : children.length); i++) {
+                const found = extractScreenshotFromStepNode(children[i]);
+                if (found) return found;
+            }
+            return null;
+        }
+
+        function extractVideoFromStepNode(step) {
+            if (!step) return null;
+            if (step.videoUrl) return step.videoUrl;
+            if (step?.media?.[0]?.videoUrl) return step.media[0].videoUrl;
+            if (Array.isArray(step.logs)) {
+                for (const log of step.logs) {
+                    if (typeof log?.details === 'string') {
+                        const match = log.details.match(/https?:\/\/[^\s'"<>]+/);
+                        if (match && /video|build|session/i.test(log.details)) return match[0];
+                    }
+                }
+            }
+            return null;
+        }
+
+        function findVideoInScenario(children, failedIndex) {
+            if (!Array.isArray(children) || children.length === 0) return null;
+            for (let i = (failedIndex >= 0 ? failedIndex : 0); i < children.length; i++) {
+                const found = extractVideoFromStepNode(children[i]);
+                if (found) return found;
+            }
+            for (let i = 0; i < children.length; i++) {
+                const found = extractVideoFromStepNode(children[i]);
+                if (found) return found;
+            }
+            return null;
+        }
+
+
+        function parseTestArray(testArray, tests, failures) {
+            if (!Array.isArray(testArray)) return;
+            testArray.forEach(item => {
+                const testCase = parseTestCase(item);
+                if (testCase) {
+                    tests.push(testCase);
+                    if (testCase.status === 'fail') failures.push(testCase);
+                }
+            });
+        }
+
+        function parseSuites(suites, tests, failures) {
+            if (Array.isArray(suites)) {
+                suites.forEach(suite => parseTestArray(suite.tests || suite.testcases || suite.test_cases || [], tests, failures));
+            } else if (typeof suites === 'object') {
+                parseTestArray(suites.tests || suites.testcases || suites.test_cases || [], tests, failures);
+            }
+        }
+
+        function parseTestCase(item) {
+            if (!item || typeof item !== 'object') return null;
+            const name = item.name || item.test_name || item.testName || item.title || item.test || item.scenario || item.scenarioName || item.description || 'Unnamed Test';
+            let status = (item.status || item.result || item.state || item.outcome || item.test_status || '').toLowerCase();
+            if (status.includes('pass') || status === 'passed' || status === 'success' || status === 'ok') status = 'pass';
+            else if (status.includes('fail') || status === 'failed' || status === 'error' || status === 'failure') status = 'fail';
+            else if (status.includes('skip') || status === 'skipped' || status === 'ignored') status = 'skip';
+            else status = (item.error || item.failure || item.errorMessage || item.failedStep) ? 'fail' : 'unknown';
+
+            const failedStep = item.failedStep || item.failed_step || item.failedStepLine || item.step || item.failingStep || item.failure_step || (status === 'fail' ? 'Step information not available' : null);
+            const error = item.error || item.errorMessage || item.error_message || item.message || item.failure || item.failureMessage || item.stackTrace || item.stack_trace || item.trace || (status === 'fail' ? 'Error details not available' : null);
+            const screenshot = item.screenshot || item.image || item.failureImage || item.failure_image || item.screenshotBase64 || null;
+            const videoUrl = item.videoUrl || item.video || '';
+            const testCaseId = item.testCaseID || item.test_case_id || item.id || item.testId || '';
+            const feature = item.feature || item.featureName || item.suite || item.category || '';
+            const allSteps = normalizeSteps(item.allSteps || item.all_steps || item.steps || []);
+            return { name, status, failedStep, error, screenshot, videoUrl, testCaseId, feature, allSteps, _raw: item };
+        }
+
+        function normalizeSteps(steps) {
+            if (Array.isArray(steps)) return steps.map((step, index) => typeof step === 'string' ? `${index + 1}. ${step}` : `${index + 1}. ${step?.status ? '[' + step.status + '] ' : ''}${step?.name || JSON.stringify(step)}`);
+            if (typeof steps === 'string' && steps.trim()) return steps.split(/\r?\n/).filter(Boolean);
+            return [];
+        }
+
+        async function classifyFailures(parsedData) {
+            const classified = {
+                ...parsedData,
+                totalTests: parsedData.tests.length,
+                passedTests: parsedData.tests.filter(t => t.status === 'pass').length,
+                failedTests: parsedData.failures.length,
+                skippedTests: parsedData.tests.filter(t => t.status === 'skip').length,
+                classifications: { bug: 0, automation: 0, data: 0, environment: 0, unknown: 0 }
+            };
+
+            classified.failures.forEach(f => {
+                f._failureId = 'f' + (++failureIdCounter);
+                failuresById.set(f._failureId, f);
+            });
+
+            let processedCount = 0;
+            for (const failure of classified.failures) {
+                processedCount++;
+                updateLoadingMessage(`Analyzing failure ${processedCount} of ${classified.failures.length}...`);
+                try {
+                    const aiAnalysis = await analyzeFailureWithAI(failure);
+                    const mappedClassification = mapAIClassification(aiAnalysis.classification);
+                    failure.classification = mappedClassification;
+                    failure.confidence = aiAnalysis.confidence || 50;
+                    failure.reason = firstText(aiAnalysis.rootCause, 'AI analysis completed');
+                    failure.aiAnalysis = normalizeAnalysis(aiAnalysis);
+                    // Real backend-generated failure identity + human-classification-feedback
+                    // state (see FailureFeedbackController / InvestigationResponse). Used by the
+                    // Root Cause tab's "Change Classification" control - must NOT use the
+                    // temporary local f1/f2 UI id (failure._failureId) for the backend call.
+                    failure.backendFailureId = aiAnalysis.failureId || null;
+                    failure.rawClassification = firstText(aiAnalysis.classification, null);
+                    failure.aiClassificationRaw = firstText(aiAnalysis.aiClassification, failure.rawClassification);
+                    failure.humanClassificationRaw = aiAnalysis.humanClassification || null;
+                    failure.classificationSource = firstText(aiAnalysis.source, 'AI');
+                    classified.classifications[mappedClassification]++;
+                } catch (error) {
+                    console.error('AI analysis failed for:', failure.name, error);
+                    const classification = classifyFailure(failure);
+                    failure.classification = classification.type;
+                    failure.confidence = classification.confidence;
+                    failure.reason = classification.reason;
+                    failure.aiAnalysis = normalizeAnalysis({ classification: classification.type, rootCauseType: 'PROBABLE', rootCause: classification.reason, severity: 'MEDIUM', confidence: classification.confidence, evidence: [], missingEvidence: [], recommendedAction: '', suggestedFix: '', stepsToReproduce: [], preventionTips: [], similarPatterns: '', screenshotObservation: '' });
+                    classified.classifications[classification.type]++;
+                }
+            }
+
+            failureGroups = groupSimilarFailures(classified.failures);
+            return classified;
+        }
+
+        function normalizeAnalysis(aiAnalysis) {
+            const rootCauseType = firstText(aiAnalysis?.rootCauseType, 'UNKNOWN');
+            const severity = firstText(aiAnalysis?.severity, 'MEDIUM');
+            return {
+                classification: firstText(aiAnalysis?.classification, 'UNKNOWN'),
+                rootCauseType,
+                rootCause: firstText(aiAnalysis?.rootCause, 'No AI root cause returned'),
+                confidence: Number(aiAnalysis?.confidence ?? 0),
+                evidence: Array.isArray(aiAnalysis?.evidence) ? aiAnalysis.evidence : [],
+                missingEvidence: Array.isArray(aiAnalysis?.missingEvidence) ? aiAnalysis.missingEvidence : [],
+                severity,
+                recommendedAction: firstText(aiAnalysis?.recommendedAction, 'No specific action returned by AI'),
+                suggestedFix: firstText(aiAnalysis?.suggestedFix, 'No code-level fix returned by AI'),
+                stepsToReproduce: Array.isArray(aiAnalysis?.stepsToReproduce) ? aiAnalysis.stepsToReproduce : [],
+                preventionTips: Array.isArray(aiAnalysis?.preventionTips) ? aiAnalysis.preventionTips : [],
+                similarPatterns: firstText(aiAnalysis?.similarPatterns, 'No similar patterns returned'),
+                screenshotObservation: firstText(aiAnalysis?.screenshotObservation, 'No screenshot observation returned')
+            };
+        }
+
+        async function analyzeFailureWithAI(failure) {
+            const compressedImage = await compressScreenshot(failure.screenshot);
+            const requestBody = {
+                testName: failure.name,
+                feature: failure.feature || '',
+                scenario: failure.name,
+                failedStep: failure.failedStep || 'Unknown step',
+                error: failure.error || 'No error details',
+                stackTrace: failure.error || '',
+                consoleLogs: '',
+                failureImage: compressedImage || '',
+                videoUrl: failure.videoUrl || '',
+                reportType: 'EXTENT',
+                allSteps: failure.allSteps.join('\n'),
+                allStepsDetail: failure.allSteps.map((step, index) => ({
+                    stepNumber: index + 1,
+                    text: step,
+                    raw: step
+                }))
+            };
+
+            const response = await fetch('/api/investigations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`API returned status ${response.status}: ${errorText}`);
+            }
+
+            return await response.json();
+        }
+
+        // Downscales and re-compresses a base64/data-URI screenshot before sending it to the
+        // backend, to reduce payload size and request/parse latency. Falls back to the original
+        // value if compression fails or the image is not decodable (e.g. non-image string).
+        function compressScreenshot(screenshot, maxWidth = 800, quality = 0.7) {
+            return new Promise((resolve) => {
+                const src = resolveScreenshotSrc(screenshot);
+                if (!src || !src.startsWith('data:image')) {
+                    resolve(screenshot || '');
+                    return;
+                }
+                try {
+                    const img = new Image();
+                    img.onload = () => {
+                        try {
+                            const scale = Math.min(1, maxWidth / img.width);
+                            const targetWidth = Math.max(1, Math.round(img.width * scale));
+                            const targetHeight = Math.max(1, Math.round(img.height * scale));
+                            const canvas = document.createElement('canvas');
+                            canvas.width = targetWidth;
+                            canvas.height = targetHeight;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+                            resolve(canvas.toDataURL('image/jpeg', quality));
+                        } catch (drawErr) {
+                            console.warn('Screenshot compression failed, using original:', drawErr);
+                            resolve(src);
+                        }
+                    };
+                    img.onerror = () => resolve(src);
+                    img.src = src;
+                } catch (err) {
+                    console.warn('Screenshot compression setup failed, using original:', err);
+                    resolve(src);
+                }
+            });
+        }
+
+        function mapAIClassification(aiClassification) {
+            if (!aiClassification) return 'unknown';
+            const classification = aiClassification.toUpperCase();
+            if (classification.includes('APPLICATION') || classification.includes('BUG') || classification.includes('PRODUCT')) return 'bug';
+            if (classification.includes('AUTOMATION') || classification.includes('TEST') || classification.includes('FRAMEWORK')) return 'automation';
+            if (classification.includes('DATA') || classification.includes('ASSERTION')) return 'data';
+            if (classification.includes('ENVIRONMENT') || classification.includes('INFRASTRUCTURE') || classification.includes('NETWORK')) return 'environment';
+            return 'unknown';
+        }
+
+        function updateLoadingMessage(message) { const el = document.getElementById('loadingProgress'); if (el) el.textContent = message; }
+        function firstText(value, fallback) { return (typeof value === 'string' && value.trim()) ? value.trim() : fallback; }
+
+        function classifyFailure(failure) {
+            const error = (failure.error || '').toLowerCase();
+            const step = (failure.failedStep || '').toLowerCase();
+            if (error.includes('element not found') || error.includes('stale element') || error.includes('no such element') || error.includes('element is not clickable') || error.includes('timeout') || error.includes('selector') || step.includes('locator')) return { type: 'automation', confidence: 85, reason: 'Element locator or interaction issue detected' };
+            if (error.includes('assertion') || error.includes('expected') || error.includes('but found') || error.includes('null') || error.includes('undefined')) {
+                if (error.includes('http') || error.includes('500') || error.includes('404')) return { type: 'bug', confidence: 75, reason: 'Server error or unexpected response' };
+                return { type: 'data', confidence: 70, reason: 'Data assertion or validation failure' };
+            }
+            if (error.includes('connection') || error.includes('network') || error.includes('refused') || error.includes('unreachable') || error.includes('session')) return { type: 'environment', confidence: 80, reason: 'Network or environment connectivity issue' };
+            if (error.includes('error') || error.includes('exception') || error.includes('failed') || error.includes('crash') || error.includes('http 5')) return { type: 'bug', confidence: 65, reason: 'Application error or unexpected behavior' };
+            return { type: 'unknown', confidence: 50, reason: 'Unable to classify failure type' };
+        }
+
+        function groupSimilarFailures(failures) {
+            const groups = new Map();
+            failures.forEach(failure => {
+                const key = `${failure.failedStep}|||${failure.classification}`;
+                if (!groups.has(key)) groups.set(key, { step: failure.failedStep, classification: failure.classification, confidence: failure.confidence, reason: failure.reason, tests: [], count: 0 });
+                const group = groups.get(key);
+                group.tests.push(failure);
+                group.count++;
+            });
+            return Array.from(groups.values()).sort((a, b) => b.count - a.count);
+        }
+
+        function renderDashboard() {
+            document.getElementById('reportName').textContent = reportData.fileName;
+            document.getElementById('totalTests').textContent = reportData.totalTests;
+            document.getElementById('passedTests').textContent = reportData.passedTests;
+            document.getElementById('failedTests').textContent = reportData.failedTests;
+            const passRate = reportData.totalTests ? Math.round((reportData.passedTests / reportData.totalTests) * 100) : 0;
+            document.getElementById('passRate').textContent = passRate + '%';
+            document.getElementById('bugCount').textContent = reportData.classifications.bug;
+            document.getElementById('automationCount').textContent = reportData.classifications.automation;
+            document.getElementById('dataCount').textContent = reportData.classifications.data;
+            document.getElementById('envCount').textContent = reportData.classifications.environment;
+            renderCharts();
+            renderFailureGroups();
+        }
+
+        function renderCharts() {
+            if (charts.results) charts.results.destroy();
+            if (charts.classification) charts.classification.destroy();
+            charts.results = new Chart(document.getElementById('resultsChart').getContext('2d'), { type: 'doughnut', data: { labels: ['Passed', 'Failed', 'Skipped'], datasets: [{ data: [reportData.passedTests, reportData.failedTests, reportData.skippedTests], backgroundColor: ['rgb(16, 185, 129)', 'rgb(239, 68, 68)', 'rgb(156, 163, 175)'] }] }, options: { responsive: true, plugins: { legend: { position: 'bottom' } } } });
+            charts.classification = new Chart(document.getElementById('classificationChart').getContext('2d'), { type: 'bar', data: { labels: ['Potential Bugs', 'Automation', 'Data Issues', 'Environment', 'Unknown'], datasets: [{ label: 'Count', data: [reportData.classifications.bug, reportData.classifications.automation, reportData.classifications.data, reportData.classifications.environment, reportData.classifications.unknown], backgroundColor: ['rgb(239, 68, 68)', 'rgb(245, 158, 11)', 'rgb(59, 130, 246)', 'rgb(124, 58, 237)', 'rgb(156, 163, 175)'] }] }, options: { responsive: true, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, plugins: { legend: { display: false } } } });
+        }
+
+        function renderFailureGroups(filter = 'all') {
+            const container = document.getElementById('failureGroupsContainer');
+            container.innerHTML = '';
+            const filteredGroups = filter === 'all' ? failureGroups : failureGroups.filter(g => g.classification === filter);
+            if (!filteredGroups.length) { container.innerHTML = '<p class="text-muted text-center">No failures found for this filter</p>'; return; }
+            filteredGroups.forEach((group, index) => container.appendChild(createFailureGroupElement(group, index)));
+        }
+
+        function createFailureGroupElement(group, index) {
+            const div = document.createElement('div');
+            div.className = 'failure-group';
+            div.dataset.index = index;
+            const classificationLabel = { bug: '🔴 Potential Bug', automation: '🟠 Automation Issue', data: '🟡 Data Issue', environment: '🔵 Environment Issue', unknown: '⚪ Unknown' }[group.classification];
+            const aiAnalysis = group.tests[0]?.aiAnalysis || normalizeAnalysis({ classification: group.classification.toUpperCase(), rootCauseType: 'UNKNOWN', rootCause: group.reason, severity: 'MEDIUM' });
+            const summaryLabel = group.step && group.step !== 'null' ? group.step : 'Grouped Failure';
+            div.innerHTML = `
+                <div class="failure-group-header">
+                    <div class="failure-group-title">
+                        <span class="classification-badge ${group.classification}">${classificationLabel}</span>
+                        <strong>${summaryLabel}</strong>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:1rem;">
+                        <span class="failure-count-badge">${group.count} test${group.count > 1 ? 's' : ''}</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                </div>
+                <div class="failure-group-body">
+                    <div class="failure-details">
+                        <div class="failure-meta">
+                            <div class="failure-meta-item"><span class="failure-meta-label">Classification</span><span class="failure-meta-value">${aiAnalysis.classification || classificationLabel}</span></div>
+                            <div class="failure-meta-item"><span class="failure-meta-label">Root Cause Type</span><span class="failure-meta-value">${aiAnalysis.rootCauseType || 'UNKNOWN'}</span></div>
+                            <div class="failure-meta-item"><span class="failure-meta-label">Severity</span><span class="failure-meta-value">${aiAnalysis.severity || 'MEDIUM'}</span></div>
+                            <div class="failure-meta-item"><span class="failure-meta-label">Confidence</span><div class="confidence-meter"><div class="confidence-bar"><div class="confidence-fill" style="width:${group.confidence}%"></div></div><span>${group.confidence}%</span></div></div>
+                            <div class="failure-meta-item"><span class="failure-meta-label">Affected Tests</span><span class="failure-meta-value">${group.count}</span></div>
+                        </div>
+                        <div class="affected-tests">
+                            <h4><i class="fas fa-list"></i> Affected Test Cases <small class="text-muted">(click a test for full AI analysis)</small></h4>
+                            <ul class="test-list">
+                                ${group.tests.map(test => `
+                                    <li class="test-list-item" data-failure-id="${test._failureId}">
+                                        <div class="test-list-item-info">
+                                            <strong>${escapeHtml(test.name)}</strong>
+                                            ${test.feature ? `<br><small class="text-muted">Feature: ${escapeHtml(test.feature)}</small>` : ''}
+                                            ${test.screenshot ? '<br><small class="text-muted"><i class="fas fa-image"></i> Screenshot available</small>' : '<br><small class="text-muted"><i class="fas fa-image-slash"></i> No screenshot</small>'}
+                                        </div>
+                                        <button type="button" class="view-details-btn"><i class="fas fa-eye"></i> View Details</button>
+                                    </li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                </div>`;
+            div.querySelector('.failure-group-header').addEventListener('click', () => div.classList.toggle('expanded'));
+            div.querySelectorAll('.test-list-item').forEach(item => {
+                item.addEventListener('click', () => openFailureModal(item.dataset.failureId));
+            });
+            return div;
+        }
+
+        function showBlock(label, value, icon) {
+            if (!value || !String(value).trim()) return '';
+            return `<div class="failure-meta-item mb-3"><span class="failure-meta-label"><i class="fas fa-${icon}"></i> ${label}</span><span class="failure-meta-value">${escapeHtml(String(value))}</span></div>`;
+        }
+
+        function showListBlock(label, value, icon, ordered = false) {
+            if (!Array.isArray(value) || !value.length) return '';
+            const items = value.map(v => `<li class="test-list-item">${escapeHtml(String(v))}</li>`).join('');
+            return `<div class="failure-meta-item mb-3"><span class="failure-meta-label"><i class="fas fa-${icon}"></i> ${label}</span>${ordered ? `<ol class="test-list" style="list-style-type: decimal; padding-left: 20px;">${items}</ol>` : `<ul class="test-list">${items}</ul>`}</div>`;
+        }
+
+        function escapeHtml(value) {
+            return value.replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\'':'&#39;','\"':'&quot;'}[ch]));
+        }
+
+        function classificationMeta(classification) {
+            return {
+                bug: { label: '🔴 Potential Bug', color: '#991b1b', bg: '#fee2e2' },
+                automation: { label: '🟠 Automation Issue', color: '#92400e', bg: '#fef3c7' },
+                data: { label: '🟡 Data Issue', color: '#1e40af', bg: '#dbeafe' },
+                environment: { label: '🔵 Environment Issue', color: '#3730a3', bg: '#e0e7ff' },
+                unknown: { label: '⚪ Unknown', color: '#374151', bg: '#e5e7eb' }
+            }[classification] || { label: '⚪ Unknown', color: '#374151', bg: '#e5e7eb' };
+        }
+
+        function severityColor(severity) {
+            return { CRITICAL: '#991b1b', HIGH: '#c2410c', MEDIUM: '#92400e', LOW: '#166534' }[String(severity).toUpperCase()] || '#374151';
+        }
+
+        function resolveScreenshotSrc(screenshot) {
+            if (!screenshot) return null;
+            const value = String(screenshot).trim();
+            if (!value) return null;
+            if (value.startsWith('data:image')) return value;
+            if (value.startsWith('http://') || value.startsWith('https://')) return value;
+            // Assume raw base64 payload without the data URI prefix.
+            if (/^[A-Za-z0-9+/=\s]+$/.test(value) && value.length > 100) return `data:image/png;base64,${value.replace(/\s+/g, '')}`;
+            return value;
+        }
+
+        function renderScreenshotTab(test, aiAnalysis) {
+            const src = resolveScreenshotSrc(test.screenshot);
+            const observation = aiAnalysis.screenshotObservation && aiAnalysis.screenshotObservation !== 'No screenshot observation returned'
+                ? aiAnalysis.screenshotObservation
+                : null;
+            let html = '';
+            if (src) {
+                html += `<div class="screenshot-frame"><img src="${src}" alt="Failure screenshot" onerror="this.parentElement.innerHTML='<div class=&quot;screenshot-missing&quot;><i class=&quot;fas fa-image-slash&quot;></i>Screenshot could not be rendered</div>'"></div>`;
+            } else {
+                html += `<div class="screenshot-frame"><div class="screenshot-missing"><i class="fas fa-image-slash"></i>No screenshot was captured for this failure</div></div>`;
+            }
+            html += `<div class="failure-meta-item mb-3"><span class="failure-meta-label"><i class="fas fa-magnifying-glass"></i> AI Screenshot Analysis</span><div class="tab-pane-body">${escapeHtml(observation || 'No visual evidence was analyzed for this failure.')}</div></div>`;
+            return html;
+        }
+
+        const CLASSIFICATION_ENUM_VALUES = [
+            'AUTOMATION_ISSUE', 'APPLICATION_ISSUE', 'API_ISSUE', 'DATA_ISSUE',
+            'ENVIRONMENT_ISSUE', 'NETWORK_ISSUE', 'UNKNOWN'
+        ];
+
+        const CLASSIFICATION_SOURCE_LABELS = {
+            AI: 'AI Analysis',
+            HUMAN_CORRECTED: 'Human Corrected',
+            HISTORICAL: 'Historical Knowledge'
+        };
+
+        function currentEffectiveClassification(test) {
+            return test.humanClassificationRaw || test.aiClassificationRaw || test.rawClassification || 'UNKNOWN';
+        }
+
+        function renderClassificationFeedbackBlock(test) {
+            const effective = currentEffectiveClassification(test);
+            const source = test.classificationSource || 'AI';
+            const sourceLabel = CLASSIFICATION_SOURCE_LABELS[source] || source;
+            const optionsHtml = CLASSIFICATION_ENUM_VALUES.map(value =>
+                `<option value="${value}" ${value === effective ? 'selected' : ''}>${value}</option>`
+            ).join('');
+            return `
+                <div class="failure-meta-item mb-3" id="classification-feedback-block">
+                    <span class="failure-meta-label"><i class="fas fa-tag"></i> Classification</span>
+                    <div id="classification-display" style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;margin-top:0.35rem;">
+                        <span class="modal-badge" id="classification-value-badge" style="background:#e5e7eb;color:#374151;">${escapeHtml(effective)}</span>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="changeClassificationBtn"><i class="fas fa-pen"></i> Change Classification</button>
+                        <span class="text-muted" id="classification-source-label" style="font-size:0.8rem;">Source: <strong>${escapeHtml(sourceLabel)}</strong></span>
+                    </div>
+                    <div id="classification-edit" style="display:none;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-top:0.75rem;">
+                        <select id="classification-select" class="form-select form-select-sm" style="max-width:260px;display:inline-block;width:auto;">${optionsHtml}</select>
+                        <button type="button" class="btn btn-sm btn-success" id="saveClassificationBtn"><i class="fas fa-check"></i> Save</button>
+                        <button type="button" class="btn btn-sm btn-secondary" id="cancelClassificationBtn">Cancel</button>
+                        <span id="classification-error" class="text-danger" style="font-size:0.8rem;display:none;"></span>
+                    </div>
+                </div>`;
+        }
+
+        function refreshClassificationFeedbackUI(test) {
+            const badge = document.getElementById('classification-value-badge');
+            const sourceLabelEl = document.getElementById('classification-source-label');
+            const editBlock = document.getElementById('classification-edit');
+            const displayBlock = document.getElementById('classification-display');
+            const effective = currentEffectiveClassification(test);
+            const source = test.classificationSource || 'AI';
+            const sourceLabel = CLASSIFICATION_SOURCE_LABELS[source] || source;
+            if (badge) badge.textContent = effective;
+            if (sourceLabelEl) sourceLabelEl.innerHTML = `Source: <strong>${escapeHtml(sourceLabel)}</strong>`;
+            if (editBlock) editBlock.style.display = 'none';
+            if (displayBlock) displayBlock.style.display = 'flex';
+        }
+
+        function attachClassificationFeedbackHandlers(test) {
+            const changeBtn = document.getElementById('changeClassificationBtn');
+            const saveBtn = document.getElementById('saveClassificationBtn');
+            const cancelBtn = document.getElementById('cancelClassificationBtn');
+            const displayBlock = document.getElementById('classification-display');
+            const editBlock = document.getElementById('classification-edit');
+
+            if (changeBtn) {
+                changeBtn.addEventListener('click', () => {
+                    if (displayBlock) displayBlock.style.display = 'none';
+                    if (editBlock) editBlock.style.display = 'flex';
+                });
+            }
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', () => {
+                    const errorEl = document.getElementById('classification-error');
+                    if (errorEl) errorEl.style.display = 'none';
+                    if (editBlock) editBlock.style.display = 'none';
+                    if (displayBlock) displayBlock.style.display = 'flex';
+                });
+            }
+            if (saveBtn) {
+                saveBtn.addEventListener('click', () => saveClassificationChange(test));
+            }
+        }
+
+        // Calls PUT /api/failures/{failureId}/classification using the backend's REAL failureId
+        // (test.backendFailureId, populated from InvestigationResponse.failureId - see
+        // classifyFailures) rather than the temporary local UI id (test._failureId). On success,
+        // updates the displayed classification/source to reflect HUMAN_CORRECTED immediately.
+        async function saveClassificationChange(test) {
+            const select = document.getElementById('classification-select');
+            const errorEl = document.getElementById('classification-error');
+            const saveBtn = document.getElementById('saveClassificationBtn');
+            if (!select) return;
+
+            const targetFailureId = test.backendFailureId;
+            if (!targetFailureId) {
+                if (errorEl) {
+                    errorEl.textContent = 'Cannot save: no backend failure id was returned for this result.';
+                    errorEl.style.display = 'inline';
+                }
+                return;
+            }
+
+            const newValue = select.value;
+            if (errorEl) errorEl.style.display = 'none';
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.dataset.originalText = saveBtn.innerHTML; saveBtn.innerHTML = 'Saving...'; }
+
+            try {
+                const response = await fetch(`/api/failures/${encodeURIComponent(targetFailureId)}/classification`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ humanClassification: newValue })
+                });
+                if (!response.ok) {
+                    const text = await response.text();
+                    throw new Error(`Server returned ${response.status}: ${text || 'unknown error'}`);
+                }
+                const result = await response.json();
+
+                // Update local state from the authoritative backend response.
+                test.aiClassificationRaw = result.aiClassification || test.aiClassificationRaw;
+                test.humanClassificationRaw = result.humanClassification || newValue;
+                test.rawClassification = result.effectiveClassification || newValue;
+                test.classificationSource = result.source || 'HUMAN_CORRECTED';
+
+                // Keep the bucket classification (bug/automation/data/environment/unknown) used
+                // by the dashboard charts/filters/grouping in sync with the corrected value.
+                test.classification = mapAIClassification(test.rawClassification);
+                if (test.aiAnalysis) test.aiAnalysis.classification = test.rawClassification;
+
+                refreshClassificationFeedbackUI(test);
+            } catch (err) {
+                console.error('Failed to save human classification:', err);
+                if (errorEl) {
+                    errorEl.textContent = 'Failed to save classification: ' + err.message;
+                    errorEl.style.display = 'inline';
+                }
+            } finally {
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = saveBtn.dataset.originalText || '<i class="fas fa-check"></i> Save';
+                }
+            }
+        }
+
+        function renderRootCauseTab(test, aiAnalysis) {
+            return `
+                ${renderClassificationFeedbackBlock(test)}
+                <div class="modal-meta-grid">
+                    <div class="modal-meta-chip"><span class="failure-meta-label">Root Cause Type</span><br><strong>${escapeHtml(aiAnalysis.rootCauseType)}</strong></div>
+                    <div class="modal-meta-chip"><span class="failure-meta-label">Severity</span><br><span class="modal-badge" style="background:#fef2f2;color:${severityColor(aiAnalysis.severity)}">${escapeHtml(aiAnalysis.severity)}</span></div>
+                    <div class="modal-meta-chip"><span class="failure-meta-label">Confidence</span><br><div class="confidence-meter"><div class="confidence-bar"><div class="confidence-fill" style="width:${aiAnalysis.confidence}%"></div></div><span>${aiAnalysis.confidence}%</span></div></div>
+                </div>
+                <div class="failure-meta-item mb-3"><span class="failure-meta-label"><i class="fas fa-bug"></i> Root Cause</span><div class="tab-pane-body">${escapeHtml(aiAnalysis.rootCause)}</div></div>
+                <div class="failure-meta-item mb-3"><span class="failure-meta-label"><i class="fas fa-code"></i> Failed Step</span><div class="tab-pane-body">${escapeHtml(test.failedStep || 'Not available')}</div></div>
+                <div class="failure-meta-item mb-3"><span class="failure-meta-label"><i class="fas fa-triangle-exclamation"></i> Error Message</span><div class="tab-pane-body">${escapeHtml(test.error || 'Not available')}</div></div>
+                <div class="failure-meta-item mb-3"><span class="failure-meta-label"><i class="fas fa-project-diagram"></i> Similar Patterns</span><div class="tab-pane-body">${escapeHtml(aiAnalysis.similarPatterns)}</div></div>`;
+        }
+
+        function renderEvidenceTab(aiAnalysis) {
+            return `${showListBlock('Evidence', aiAnalysis.evidence, 'clipboard-list')}
+                ${showListBlock('Missing Evidence', aiAnalysis.missingEvidence, 'circle-question')}
+                ${(!aiAnalysis.evidence.length && !aiAnalysis.missingEvidence.length) ? '<p class="text-muted">No evidence details returned by AI.</p>' : ''}`;
+        }
+
+        function renderReproduceTab(aiAnalysis) {
+            return `${showListBlock('Steps to Reproduce', aiAnalysis.stepsToReproduce, 'list-ol', true)}
+                ${!aiAnalysis.stepsToReproduce.length ? '<p class="text-muted">No reproduction steps returned by AI.</p>' : ''}`;
+        }
+
+        function renderFixTab(aiAnalysis) {
+            return `${showBlock('Recommended Action', aiAnalysis.recommendedAction, 'lightbulb')}
+                ${showBlock('Suggested Fix', aiAnalysis.suggestedFix, 'wrench')}
+                ${showListBlock('Prevention Tips', aiAnalysis.preventionTips, 'shield-alt')}`;
+        }
+
+        function renderStepsTab(test) {
+            if (!Array.isArray(test.allSteps) || !test.allSteps.length) return '<p class="text-muted">No step history available.</p>';
+            const items = test.allSteps.map(step => `<li class="test-list-item" style="cursor:default;">${escapeHtml(step)}</li>`).join('');
+            return `<ul class="test-list">${items}</ul>`;
+        }
+
+        function renderVideoTab(test) {
+            if (!test.videoUrl) return '<p class="text-muted">No video evidence available for this failure.</p>';
+            return `<div class="video-link-box"><i class="fas fa-video"></i> <a href="${test.videoUrl}" target="_blank" rel="noopener">${escapeHtml(test.videoUrl)}</a></div>`;
+        }
+
+        function openFailureModal(failureId) {
+            const test = failuresById.get(failureId);
+            if (!test) return;
+            const aiAnalysis = test.aiAnalysis || normalizeAnalysis({});
+            const meta = classificationMeta(test.classification);
+
+            const titleEl = document.getElementById('failureModalTitle');
+            const subtitleEl = document.getElementById('failureModalSubtitle');
+            if (titleEl) titleEl.textContent = test.name || 'Failure Details';
+            if (subtitleEl) subtitleEl.textContent = (test.feature ? test.feature + ' • ' : '') + (test.failedStep || '');
+
+            const tabs = [
+                { id: 'screenshot', icon: 'fa-image', label: 'Screenshot Analysis', render: () => renderScreenshotTab(test, aiAnalysis) },
+                { id: 'rootcause', icon: 'fa-bug', label: 'Root Cause', render: () => renderRootCauseTab(test, aiAnalysis) },
+                { id: 'evidence', icon: 'fa-clipboard-list', label: 'Evidence', render: () => renderEvidenceTab(aiAnalysis) },
+                { id: 'reproduce', icon: 'fa-list-ol', label: 'Steps to Reproduce', render: () => renderReproduceTab(aiAnalysis) },
+                { id: 'fix', icon: 'fa-wrench', label: 'Fix & Actions', render: () => renderFixTab(aiAnalysis) },
+                { id: 'allsteps', icon: 'fa-shoe-prints', label: 'All Test Steps', render: () => renderStepsTab(test) },
+                { id: 'video', icon: 'fa-video', label: 'Video', render: () => renderVideoTab(test) }
+            ];
+
+            const tabsEl = document.getElementById('failureModalTabs');
+            const contentEl = document.getElementById('failureModalTabContent');
+            if (!tabsEl || !contentEl) return;
+
+            tabsEl.innerHTML = tabs.map((tab, idx) => `
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link ${idx === 0 ? 'active' : ''}" id="tab-btn-${tab.id}" data-bs-toggle="tab" data-bs-target="#tab-pane-${tab.id}" type="button" role="tab">
+                        <i class="fas ${tab.icon}"></i>${escapeHtml(tab.label)}
+                    </button>
+                </li>`).join('');
+
+            contentEl.innerHTML = tabs.map((tab, idx) => `
+                <div class="tab-pane fade ${idx === 0 ? 'show active' : ''}" id="tab-pane-${tab.id}" role="tabpanel">
+                    ${tab.render()}
+                </div>`).join('');
+
+            // The Root Cause tab's "Change Classification" control is rendered as static HTML
+            // above; wire up its click handlers now that the elements exist in the DOM.
+            attachClassificationFeedbackHandlers(test);
+
+            showFailureModal();
+        }
+
+        function showFailureModal() {
+            const modalEl = document.getElementById('failureDetailModal');
+            if (!modalEl) { console.warn('Modal elements not found in DOM'); return; }
+            try {
+                if (window.bootstrap && window.bootstrap.Modal) {
+                    if (!failureModalInstance) {
+                        failureModalInstance = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+                    }
+                    failureModalInstance.show();
+                    return;
+                }
+                throw new Error('Bootstrap Modal not available');
+            } catch (err) {
+                console.warn('Bootstrap native modal failed, trying jQuery:', err);
+                try {
+                    if (window.jQuery) {
+                        window.jQuery(modalEl).modal('show');
+                        return;
+                    }
+                } catch (jqErr) {
+                    console.error('jQuery modal fallback failed:', jqErr);
+                }
+                // Last resort: manually toggle visibility
+                modalEl.style.display = 'block';
+                modalEl.classList.add('show');
+                modalEl.removeAttribute('aria-hidden');
+            }
+        }
+
+        function initFilters() {
+            const filterBtns = document.querySelectorAll('.filter-btn');
+            filterBtns.forEach(btn => btn.addEventListener('click', () => {
+                filterBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentFilter = btn.dataset.filter;
+                renderFailureGroups(currentFilter);
+            }));
+        }
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,93 @@
+[
+  {
+    "testCaseID": "TC001",
+    "name": "Login with valid credentials",
+    "status": "passed",
+    "feature": "Authentication",
+    "duration": 2500
+  },
+  {
+    "testCaseID": "TC002",
+    "name": "Verify product search functionality",
+    "status": "failed",
+    "feature": "Search",
+    "failedStep": "When user searches for 'Laptop'",
+    "errorMessage": "org.openqa.selenium.TimeoutException: Expected condition failed: waiting for visibility of element located by By.id('search-results')",
+    "stackTrace": "org.openqa.selenium.TimeoutException: Expected condition failed\n\tat SearchPage.waitForResults(SearchPage.java:45)\n\tat SearchSteps.searchForProduct(SearchSteps.java:23)",
+    "screenshot": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    "duration": 30000
+  },
+  {
+    "testCaseID": "TC003",
+    "name": "Add product to cart",
+    "status": "failed",
+    "feature": "Shopping Cart",
+    "failedStep": "Then cart should contain 1 item",
+    "errorMessage": "java.lang.AssertionError: expected [1] but found [0]",
+    "stackTrace": "java.lang.AssertionError: expected [1] but found [0]\n\tat CartSteps.verifyCartCount(CartSteps.java:67)",
+    "duration": 5000
+  },
+  {
+    "testCaseID": "TC004",
+    "name": "Complete checkout process",
+    "status": "failed",
+    "feature": "Checkout",
+    "failedStep": "When user clicks 'Place Order'",
+    "errorMessage": "java.net.ConnectException: Connection refused (Connection refused)",
+    "stackTrace": "java.net.ConnectException: Connection refused\n\tat CheckoutService.placeOrder(CheckoutService.java:89)",
+    "duration": 15000
+  },
+  {
+    "testCaseID": "TC005",
+    "name": "User profile update",
+    "status": "passed",
+    "feature": "User Profile",
+    "duration": 3000
+  },
+  {
+    "testCaseID": "TC006",
+    "name": "Password reset",
+    "status": "skipped",
+    "feature": "Authentication",
+    "reason": "Test environment not available"
+  },
+  {
+    "testCaseID": "TC007",
+    "name": "View order history",
+    "status": "failed",
+    "feature": "Orders",
+    "failedStep": "Then order list should be displayed",
+    "errorMessage": "org.openqa.selenium.NoSuchElementException: no such element: Unable to locate element: {\"method\":\"css selector\",\"selector\":\".order-list\"}",
+    "stackTrace": "org.openqa.selenium.NoSuchElementException: no such element\n\tat OrdersPage.getOrderList(OrdersPage.java:34)",
+    "duration": 10000
+  },
+  {
+    "testCaseID": "TC008",
+    "name": "Apply discount code",
+    "status": "passed",
+    "feature": "Promotions",
+    "duration": 4000
+  },
+  {
+    "testCaseID": "TC009",
+    "name": "Verify product search functionality - Mobile",
+    "status": "failed",
+    "feature": "Search",
+    "failedStep": "When user searches for 'Phone'",
+    "errorMessage": "org.openqa.selenium.TimeoutException: Expected condition failed: waiting for visibility of element located by By.id('search-results')",
+    "stackTrace": "org.openqa.selenium.TimeoutException: Expected condition failed\n\tat SearchPage.waitForResults(SearchPage.java:45)",
+    "duration": 30000
+  },
+  {
+    "testCaseID": "TC010",
+    "name": "Payment with credit card",
+    "status": "failed",
+    "feature": "Payment",
+    "failedStep": "When user enters credit card details",
+    "errorMessage": "HTTP 500 Internal Server Error: Payment gateway error",
+    "stackTrace": "PaymentException: Payment gateway returned error\n\tat PaymentService.processPayment(PaymentService.java:123)",
+    "screenshot": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    "duration": 8000
+  }
+]
+
