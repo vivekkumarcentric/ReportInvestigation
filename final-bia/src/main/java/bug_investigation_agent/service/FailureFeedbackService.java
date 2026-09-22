@@ -169,6 +169,58 @@ public class FailureFeedbackService {
     }
 
     /**
+     * Returns the raw persisted feedback record for an exact {@code failureId} match.
+     *
+     * <p>This is used by {@link InvestigationService} to reuse previously saved failure details
+     * without re-calling Ollama when the same failure appears again.</p>
+     */
+    public Optional<FailureFeedback> getFeedbackByFailureId(String failureId) {
+        if (failureId == null || failureId.isBlank()) {
+            return Optional.empty();
+        }
+        return repository.findByFailureId(failureId);
+    }
+
+    /**
+     * Creates an alias row for a failure under a new id if needed, preserving the learned
+     * classification context while rolling out a new id-generation strategy.
+     */
+    public void copyFeedbackToFailureId(FailureFeedback source, String targetFailureId) {
+        if (source == null || targetFailureId == null || targetFailureId.isBlank()) {
+            return;
+        }
+        if (targetFailureId.equals(source.getFailureId())) {
+            return;
+        }
+        try {
+            if (repository.findByFailureId(targetFailureId).isPresent()) {
+                return;
+            }
+            FailureFeedback copy = new FailureFeedback();
+            copy.setFailureId(targetFailureId);
+            copy.setScenarioName(source.getScenarioName());
+            copy.setFeatureName(source.getFeatureName());
+            copy.setFailedStepLine(source.getFailedStepLine());
+            copy.setNormalizedStep(source.getNormalizedStep());
+            copy.setNormalizedError(source.getNormalizedError());
+            copy.setExceptionType(source.getExceptionType());
+            copy.setLocator(source.getLocator());
+            copy.setStackTracePattern(source.getStackTracePattern());
+            copy.setAiClassification(source.getAiClassification());
+            copy.setHumanClassification(source.getHumanClassification());
+            copy.setRootCause(source.getRootCause());
+            copy.setConfidence(source.getConfidence());
+            Instant now = Instant.now();
+            copy.setCreatedAt(source.getCreatedAt() == null ? now : source.getCreatedAt());
+            copy.setUpdatedAt(now);
+            repository.upsert(copy);
+        } catch (Exception e) {
+            log.warn("Failed to copy feedback alias {} -> {}: {}",
+                    source.getFailureId(), targetFailureId, e.getMessage());
+        }
+    }
+
+    /**
      * Cross-report historical similarity match: reuses a human classification for a DIFFERENT
      * failure (different {@code failureId}) that is nonetheless the same underlying logical
      * failure re-appearing (e.g. in a re-run report). Only called by
@@ -208,6 +260,8 @@ public class FailureFeedbackService {
 
         String locator = extractLocator(combined);
         boolean hasLocator = locator != null && !locator.isBlank();
+        boolean dynamicLocator = hasLocator && isLikelyDynamicLocator(locator);
+        String normalizedRequestLocator = hasLocator ? normalizeLocatorForMatch(locator) : null;
         String normalizedStep = normalizeStep(request.getFailedStep());
 
         List<FailureFeedback> candidates;
@@ -224,9 +278,17 @@ public class FailureFeedbackService {
 
         List<FailureFeedback> matched = new ArrayList<>();
         for (FailureFeedback candidate : candidates) {
-            if (hasLocator) {
-                String candidateLocator = candidate.getLocator();
+            String candidateLocator = candidate.getLocator();
+            if (hasLocator && !dynamicLocator) {
                 if (candidateLocator != null && locator.equalsIgnoreCase(candidateLocator)) {
+                    matched.add(candidate);
+                }
+            } else if (hasLocator) {
+                boolean locatorPatternMatch = candidateLocator != null
+                        && normalizedRequestLocator.equalsIgnoreCase(normalizeLocatorForMatch(candidateLocator));
+                boolean stepMatch = normalizedStep != null && !normalizedStep.isBlank()
+                        && normalizedStep.equalsIgnoreCase(candidate.getNormalizedStep());
+                if (locatorPatternMatch || stepMatch) {
                     matched.add(candidate);
                 }
             } else if (normalizedStep != null && !normalizedStep.isBlank()
@@ -323,6 +385,26 @@ public class FailureFeedbackService {
             }
         }
         return null;
+    }
+
+    private boolean isLikelyDynamicLocator(String locator) {
+        if (locator == null || locator.isBlank()) {
+            return false;
+        }
+        String lower = locator.toLowerCase();
+        return lower.matches(".*[_-]\\d{3,}.*")
+                || lower.matches(".*\\[\\d+\\].*")
+                || lower.matches(".*\\d{4,}.*");
+    }
+
+    private String normalizeLocatorForMatch(String locator) {
+        if (locator == null) {
+            return "";
+        }
+        return locator.trim().toLowerCase()
+                .replaceAll("\\[\\d+\\]", "[#]")
+                .replaceAll("\\d{3,}", "<num>")
+                .replaceAll("\\s+", " ");
     }
 
     private static boolean isBlank(String value) {
