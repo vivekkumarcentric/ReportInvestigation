@@ -48,11 +48,10 @@ public class InvestigationService {
      * (including retries), and returns those metrics alongside the result so callers that process
      * many failures (e.g. report analysis) can aggregate report-level totals.
      *
-     * <p>Before calling Ollama, this checks whether a human has already classified this exact
-     * failure (matched by the same stable {@code failureId} used elsewhere for feedback). If so,
-     * the historical human classification is returned directly - with {@code source = HISTORICAL}
-     * and zero Ollama calls - since re-asking the AI to reclassify a failure a human has already
-     * corrected would waste time and could disagree with the human's decision.</p>
+    * <p>Before calling Ollama, this checks whether this exact failure already exists in the
+    * feedback database (matched by the same stable {@code failureId} used elsewhere for
+    * persistence). If present, the saved details are returned directly - with zero Ollama calls -
+    * instead of re-invoking the model for the same failure.</p>
      *
      * <p>If no exact match exists, a secondary cross-report similarity check
      * ({@link FailureFeedbackService#findHistoricalMatch(InvestigationRequest)}) looks for the
@@ -66,15 +65,26 @@ public class InvestigationService {
                 request == null ? null : request.getFeature(),
                 request == null ? null : request.getFailedStep(),
                 request == null ? null : request.getError());
+        String legacyFailureId = FailureIdGenerator.generateLegacy(
+                request == null ? null : request.getScenario(),
+                request == null ? null : request.getFeature(),
+                request == null ? null : request.getFailedStep(),
+                request == null ? null : request.getError());
 
-        Optional<bug_investigation_agent.model.response.FailureClassificationResponse> historical =
-                failureFeedbackService.getClassification(failureId);
-        if (historical.isPresent()) {
-            String humanClassification = historical.get().getHumanClassification();
-            if (humanClassification != null && !humanClassification.isBlank()) {
-                log.info("Historical human classification found for failureId={} (scenario={}); skipping Ollama.",
-                        failureId, scenarioId);
-                return buildHistoricalOutcome(failureId, historical.get());
+        Optional<FailureFeedback> exactMatch = failureFeedbackService.getFeedbackByFailureId(failureId);
+        if (exactMatch.isPresent()) {
+            log.info("Historical DB record found for failureId={} (scenario={}); skipping Ollama.",
+                    failureId, scenarioId);
+            return buildHistoricalOutcomeFromFeedback(failureId, exactMatch.get());
+        }
+
+        if (!failureId.equals(legacyFailureId)) {
+            Optional<FailureFeedback> legacyMatch = failureFeedbackService.getFeedbackByFailureId(legacyFailureId);
+            if (legacyMatch.isPresent()) {
+                log.info("Legacy-id DB record found for legacyFailureId={} -> failureId={} (scenario={}); skipping Ollama.",
+                        legacyFailureId, failureId, scenarioId);
+                failureFeedbackService.copyFeedbackToFailureId(legacyMatch.get(), failureId);
+                return buildHistoricalOutcomeFromFeedback(failureId, legacyMatch.get());
             }
         }
 
@@ -168,6 +178,42 @@ public class InvestigationService {
         response.setRootCause(
                 "Classification based on a previously confirmed human correction for this exact failure. "
                 + "Ollama was not called for this result.");
+        return new InvestigationOutcome(response, new ArrayList<>());
+    }
+
+    /**
+     * Builds an {@link InvestigationOutcome} from an exact database hit for {@code failureId},
+     * with empty {@code callMetrics} since Ollama was not invoked.
+     */
+    private InvestigationOutcome buildHistoricalOutcomeFromFeedback(String failureId, FailureFeedback feedback) {
+        InvestigationResponse response = new InvestigationResponse();
+        response.setFailureId(failureId);
+
+        String ai = feedback.getAiClassification();
+        String human = feedback.getHumanClassification();
+        boolean hasHuman = human != null && !human.isBlank();
+
+        String effective = hasHuman
+                ? human
+                : (ai == null || ai.isBlank() ? "UNKNOWN" : ai);
+
+        response.setAiClassification(ai);
+        response.setHumanClassification(hasHuman ? human : null);
+        response.setClassification(effective);
+        response.setSource(hasHuman
+                ? FailureFeedbackService.SOURCE_HUMAN_CORRECTED
+                : FailureFeedbackService.SOURCE_HISTORICAL);
+
+        if (feedback.getConfidence() != null) {
+            response.setConfidence(feedback.getConfidence());
+        }
+        if (feedback.getRootCause() != null && !feedback.getRootCause().isBlank()) {
+            response.setRootCause(feedback.getRootCause());
+        } else {
+            response.setRootCause("Result loaded from previously saved failure details. Ollama was not called.");
+        }
+        response.setRootCauseType("CONFIRMED");
+
         return new InvestigationOutcome(response, new ArrayList<>());
     }
 
