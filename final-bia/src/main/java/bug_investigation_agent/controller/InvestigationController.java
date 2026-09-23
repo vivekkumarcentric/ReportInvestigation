@@ -18,8 +18,14 @@ public class InvestigationController {
 
     @PostMapping
     public InvestigationResponse investigate(
-            @RequestBody InvestigationRequest request) {
+            @RequestBody(required = false) InvestigationRequest request,
+            @RequestParam(name = "forceReanalysis", defaultValue = "false") boolean forceReanalysis) {
 
-        return investigationService.investigate(request);
+        InvestigationRequest safeRequest = request == null ? new InvestigationRequest() : request;
+        if (forceReanalysis) {
+            safeRequest.setForceReanalysis(true);
+        }
+
+        return investigationService.investigate(safeRequest);
     }
 }

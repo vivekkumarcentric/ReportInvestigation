@@ -1,0 +1,52 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------< com.aiqa:bug-investigation-agent >------------------
+[INFO] Building  0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] >>> spring-boot:4.0.7:run (default-cli) > test-compile @ bug-investigation-agent >>>
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ bug-investigation-agent ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 2 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.14.1:compile (default-compile) @ bug-investigation-agent ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ bug-investigation-agent ---
+[INFO] Copying 6 resources from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.14.1:testCompile (default-testCompile) @ bug-investigation-agent ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] <<< spring-boot:4.0.7:run (default-cli) < test-compile @ bug-investigation-agent <<<
+[INFO] 
+[INFO] 
+[INFO] --- spring-boot:4.0.7:run (default-cli) @ bug-investigation-agent ---
+[INFO] Attaching agents: []
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.0.7)
+
+2026-09-23T12:48:16.696+05:30  INFO 76220 --- [bug-investigation-agent] [           main] b.BugInvestigationAgentApplication       : Starting BugInvestigationAgentApplication using Java 17.0.12 with PID 76220 (/Users/VivekKumar/Report Analyser/ReportInvestigation/final-bia/target/classes started by VivekKumar in /Users/VivekKumar/Report Analyser/ReportInvestigation/final-bia)
+2026-09-23T12:48:16.697+05:30  INFO 76220 --- [bug-investigation-agent] [           main] b.BugInvestigationAgentApplication       : No active profile set, falling back to 1 default profile: "default"
+2026-09-23T12:48:17.098+05:30  INFO 76220 --- [bug-investigation-agent] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat initialized with port 8080 (http)
+2026-09-23T12:48:17.105+05:30  INFO 76220 --- [bug-investigation-agent] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-09-23T12:48:17.105+05:30  INFO 76220 --- [bug-investigation-agent] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/11.0.22]
+2026-09-23T12:48:17.129+05:30  INFO 76220 --- [bug-investigation-agent] [           main] b.w.c.s.WebApplicationContextInitializer : Root WebApplicationContext: initialization completed in 412 ms
+2026-09-23T12:48:17.708+05:30  INFO 76220 --- [bug-investigation-agent] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat started on port 8080 (http) with context path '/'
+2026-09-23T12:48:17.710+05:30  INFO 76220 --- [bug-investigation-agent] [           main] b.BugInvestigationAgentApplication       : Started BugInvestigationAgentApplication in 1.19 seconds (process running for 1.386)
+2026-09-23T12:48:18.060+05:30  INFO 76220 --- [bug-investigation-agent] [nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-09-23T12:48:18.060+05:30  INFO 76220 --- [bug-investigation-agent] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-09-23T12:48:18.061+05:30  INFO 76220 --- [bug-investigation-agent] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+2026-09-23T12:49:11.528+05:30  INFO 76220 --- [bug-investigation-agent] [nio-8080-exec-3] b.service.InvestigationService           : Historical DB record found for failureId=484e2618b8a25939 (scenario=Verify the navigation menu for ce users); skipping Ollama.
+2026-09-23T12:49:11.568+05:30  INFO 76220 --- [bug-investigation-agent] [nio-8080-exec-4] b.service.InvestigationService           : Historical DB record found for failureId=725bf069b6a79853 (scenario=verify the monthly sales target end to end flow for pepsico3.1); skipping Ollama.
+2026-09-23T12:49:11.573+05:30  INFO 76220 --- [bug-investigation-agent] [nio-8080-exec-5] b.service.InvestigationService           : Historical DB record found for failureId=6f38af9a1bae1ede (scenario=validate delivered offline order details in order history screen); skipping Ollama.
+2026-09-23T12:49:11.601+05:30  INFO 76220 --- [bug-investigation-agent] [nio-8080-exec-6] b.service.InvestigationService           : Historical DB record found for failureId=ceecdfd4f800a5ae (scenario=verify the product sales target end to end flow for pepsico3.1); skipping Ollama.

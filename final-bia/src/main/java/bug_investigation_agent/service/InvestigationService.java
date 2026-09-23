@@ -6,6 +6,7 @@ import bug_investigation_agent.model.request.InvestigationRequest;
 import bug_investigation_agent.model.response.InvestigationResponse;
 import bug_investigation_agent.prompt.InvestigationPromptBuilder;
 import bug_investigation_agent.util.FailureIdGenerator;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -60,6 +61,7 @@ public class InvestigationService {
      * (single, non-conflicting match only).</p>
      */
     public InvestigationOutcome investigateWithMetrics(InvestigationRequest request, String scenarioId) {
+        boolean forceReanalysis = request != null && request.isForceReanalysisEnabled();
         String failureId = FailureIdGenerator.generate(
                 request == null ? null : request.getScenario(),
                 request == null ? null : request.getFeature(),
@@ -71,30 +73,37 @@ public class InvestigationService {
                 request == null ? null : request.getFailedStep(),
                 request == null ? null : request.getError());
 
-        Optional<FailureFeedback> exactMatch = failureFeedbackService.getFeedbackByFailureId(failureId);
-        if (exactMatch.isPresent()) {
-            log.info("Historical DB record found for failureId={} (scenario={}); skipping Ollama.",
-                    failureId, scenarioId);
-            return buildHistoricalOutcomeFromFeedback(failureId, exactMatch.get());
-        }
-
-        if (!failureId.equals(legacyFailureId)) {
-            Optional<FailureFeedback> legacyMatch = failureFeedbackService.getFeedbackByFailureId(legacyFailureId);
-            if (legacyMatch.isPresent()) {
-                log.info("Legacy-id DB record found for legacyFailureId={} -> failureId={} (scenario={}); skipping Ollama.",
-                        legacyFailureId, failureId, scenarioId);
-                failureFeedbackService.copyFeedbackToFailureId(legacyMatch.get(), failureId);
-                return buildHistoricalOutcomeFromFeedback(failureId, legacyMatch.get());
+        boolean historicalFound = false;
+        if (forceReanalysis) {
+            log.info("Force re-analysis requested for failureId={}. Bypassing historical analysis.", failureId);
+        } else {
+            Optional<FailureFeedback> exactMatch = failureFeedbackService.getFeedbackByFailureId(failureId);
+            if (exactMatch.isPresent()) {
+                historicalFound = true;
+                if (failureFeedbackService.isAnalysisComplete(exactMatch.get())) {
+                    log.info("Complete historical analysis found for failureId={}. Returning persisted result.", failureId);
+                    return buildHistoricalOutcomeFromFeedback(failureId, exactMatch.get());
+                }
+                log.info("Historical analysis incomplete for failureId={}. Running enrichment analysis.", failureId);
             }
-        }
 
-        Optional<bug_investigation_agent.model.response.FailureClassificationResponse> crossReportMatch =
-                failureFeedbackService.findHistoricalMatch(request);
-        if (crossReportMatch.isPresent()) {
-            log.info(
-                    "Cross-report historical similarity match found for failureId={} (scenario={}); skipping Ollama.",
-                    failureId, scenarioId);
-            return buildHistoricalOutcome(failureId, crossReportMatch.get());
+            if (!historicalFound && !failureId.equals(legacyFailureId)) {
+                Optional<FailureFeedback> legacyMatch = failureFeedbackService.getFeedbackByFailureId(legacyFailureId);
+                if (legacyMatch.isPresent()) {
+                    historicalFound = true;
+                    failureFeedbackService.copyFeedbackToFailureId(legacyMatch.get(), failureId);
+                    Optional<FailureFeedback> aliased = failureFeedbackService.getFeedbackByFailureId(failureId);
+                    if (aliased.isPresent() && failureFeedbackService.isAnalysisComplete(aliased.get())) {
+                        log.info("Complete historical analysis found for failureId={}. Returning persisted result.", failureId);
+                        return buildHistoricalOutcomeFromFeedback(failureId, aliased.get());
+                    }
+                    log.info("Historical analysis incomplete for failureId={}. Running enrichment analysis.", failureId);
+                }
+            }
+
+            if (!historicalFound) {
+                log.info("No historical analysis found for failureId={}. Running fresh analysis.", failureId);
+            }
         }
 
         long promptBuildStart = System.nanoTime();
@@ -126,7 +135,9 @@ public class InvestigationService {
                 String json = normalizeResponse(repairJson(extractJson(generation.response())));
                 InvestigationResponse parsed = objectMapper.readValue(json, InvestigationResponse.class);
                 correctHallucinatedScreenshotText(parsed, image);
+                log.info("Updating existing failure record: {}", failureId);
                 applyHumanFeedback(failureId, request, parsed);
+                log.info("Updated historical analysis for failureId={} with enriched AI result.", failureId);
 
                 long parseMillis = (System.nanoTime() - parseStart) / 1_000_000;
                 long totalMillis = promptBuildMillis + generation.httpDurationMillis() + parseMillis;
@@ -158,30 +169,6 @@ public class InvestigationService {
     }
 
     /**
-     * Builds an {@link InvestigationOutcome} directly from a previously-saved human classification,
-     * with an empty {@code callMetrics} list since Ollama was never invoked. Only the
-     * classification/source fields are populated with confidence from the historical record; the
-     * remaining analysis fields (evidence, steps to reproduce, etc.) are not available from a
-     * classification-only history record and are left as sensible defaults.
-     */
-    private InvestigationOutcome buildHistoricalOutcome(
-            String failureId,
-            bug_investigation_agent.model.response.FailureClassificationResponse historical) {
-        InvestigationResponse response = new InvestigationResponse();
-        response.setFailureId(failureId);
-        response.setAiClassification(historical.getAiClassification());
-        response.setHumanClassification(historical.getHumanClassification());
-        response.setClassification(historical.getHumanClassification());
-        response.setSource(FailureFeedbackService.SOURCE_HISTORICAL);
-        response.setConfidence(100);
-        response.setRootCauseType("CONFIRMED");
-        response.setRootCause(
-                "Classification based on a previously confirmed human correction for this exact failure. "
-                + "Ollama was not called for this result.");
-        return new InvestigationOutcome(response, new ArrayList<>());
-    }
-
-    /**
      * Builds an {@link InvestigationOutcome} from an exact database hit for {@code failureId},
      * with empty {@code callMetrics} since Ollama was not invoked.
      */
@@ -200,9 +187,13 @@ public class InvestigationService {
         response.setAiClassification(ai);
         response.setHumanClassification(hasHuman ? human : null);
         response.setClassification(effective);
-        response.setSource(hasHuman
-                ? FailureFeedbackService.SOURCE_HUMAN_CORRECTED
-                : FailureFeedbackService.SOURCE_HISTORICAL);
+        if (feedback.getSource() != null && !feedback.getSource().isBlank()) {
+            response.setSource(feedback.getSource());
+        } else {
+            response.setSource(hasHuman
+                    ? FailureFeedbackService.SOURCE_HUMAN_CORRECTED
+                    : FailureFeedbackService.SOURCE_HISTORICAL);
+        }
 
         if (feedback.getConfidence() != null) {
             response.setConfidence(feedback.getConfidence());
@@ -212,9 +203,30 @@ public class InvestigationService {
         } else {
             response.setRootCause("Result loaded from previously saved failure details. Ollama was not called.");
         }
-        response.setRootCauseType("CONFIRMED");
+        response.setRootCauseType(feedback.getRootCauseType());
+        response.setSeverity(feedback.getSeverity());
+        response.setRecommendedAction(feedback.getRecommendedAction());
+        response.setSuggestedFix(feedback.getSuggestedFix());
+        response.setSimilarPatterns(feedback.getSimilarPatterns());
+        response.setScreenshotObservation(feedback.getScreenshotObservation());
+        response.setEvidence(parseListJson(feedback.getEvidenceJson()));
+        response.setMissingEvidence(parseListJson(feedback.getMissingEvidenceJson()));
+        response.setPreventionTips(parseListJson(feedback.getPreventionTipsJson()));
+        response.setStepsToReproduce(parseListJson(feedback.getStepsToReproduceJson()));
 
         return new InvestigationOutcome(response, new ArrayList<>());
+    }
+
+    private List<String> parseListJson(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<String>>() { });
+        } catch (Exception e) {
+            log.warn("Failed to parse persisted JSON list field: {}", e.getMessage());
+            return null;
+        }
     }
 
 

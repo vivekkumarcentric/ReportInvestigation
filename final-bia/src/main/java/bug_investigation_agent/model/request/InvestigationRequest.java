@@ -15,6 +15,7 @@ public class InvestigationRequest {
     private String reportType;
     private String allSteps;
     private List<Object> allStepsDetail;
+    private Boolean forceReanalysis;
 
     public String getAllSteps() { return allSteps; }
     public void setAllSteps(String allSteps) { this.allSteps = allSteps; }
@@ -42,4 +43,11 @@ public class InvestigationRequest {
     public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
     public String getReportType() { return reportType; }
     public void setReportType(String reportType) { this.reportType = reportType; }
+
+    public Boolean getForceReanalysis() { return forceReanalysis; }
+    public void setForceReanalysis(Boolean forceReanalysis) { this.forceReanalysis = forceReanalysis; }
+
+    public boolean isForceReanalysisEnabled() {
+        return Boolean.TRUE.equals(forceReanalysis);
+    }
 }

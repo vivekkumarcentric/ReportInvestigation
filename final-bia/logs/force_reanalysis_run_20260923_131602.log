@@ -1,0 +1,41 @@
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.0.7)
+
+2026-09-23T13:16:04.282+05:30  INFO 20279 --- [bug-investigation-agent] [           main] b.BugInvestigationAgentApplication       : Starting BugInvestigationAgentApplication using Java 17.0.12 with PID 20279 (/Users/VivekKumar/Report Analyser/ReportInvestigation/final-bia/target/classes started by VivekKumar in /Users/VivekKumar/Report Analyser/ReportInvestigation/final-bia)
+2026-09-23T13:16:04.283+05:30  INFO 20279 --- [bug-investigation-agent] [           main] b.BugInvestigationAgentApplication       : No active profile set, falling back to 1 default profile: "default"
+2026-09-23T13:16:04.678+05:30  INFO 20279 --- [bug-investigation-agent] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat initialized with port 8080 (http)
+2026-09-23T13:16:04.684+05:30  INFO 20279 --- [bug-investigation-agent] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-09-23T13:16:04.684+05:30  INFO 20279 --- [bug-investigation-agent] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/11.0.22]
+2026-09-23T13:16:04.714+05:30  INFO 20279 --- [bug-investigation-agent] [           main] b.w.c.s.WebApplicationContextInitializer : Root WebApplicationContext: initialization completed in 410 ms
+2026-09-23T13:16:05.220+05:30  INFO 20279 --- [bug-investigation-agent] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat started on port 8080 (http) with context path '/'
+2026-09-23T13:16:05.223+05:30  INFO 20279 --- [bug-investigation-agent] [           main] b.BugInvestigationAgentApplication       : Started BugInvestigationAgentApplication in 1.101 seconds (process running for 1.25)
+2026-09-23T13:16:05.284+05:30  INFO 20279 --- [bug-investigation-agent] [nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-09-23T13:16:05.285+05:30  INFO 20279 --- [bug-investigation-agent] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-09-23T13:16:05.285+05:30  INFO 20279 --- [bug-investigation-agent] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 0 ms
+2026-09-23T13:16:05.323+05:30  INFO 20279 --- [bug-investigation-agent] [nio-8080-exec-1] b.service.InvestigationService           : Force re-analysis requested for failureId=565d240f5343e625. Bypassing historical analysis.
+2026-09-23T13:16:16.101+05:30  INFO 20279 --- [bug-investigation-agent] [nio-8080-exec-1] b.service.InvestigationService           : Updating existing failure record: 565d240f5343e625
+2026-09-23T13:16:16.106+05:30  INFO 20279 --- [bug-investigation-agent] [nio-8080-exec-1] b.service.FailureFeedbackService         : Updating existing failure record: 565d240f5343e625
+2026-09-23T13:16:16.116+05:30  INFO 20279 --- [bug-investigation-agent] [nio-8080-exec-1] b.service.InvestigationService           : Updated historical analysis for failureId=565d240f5343e625 with enriched AI result.
+2026-09-23T13:16:16.116+05:30  INFO 20279 --- [bug-investigation-agent] [nio-8080-exec-1] b.service.InvestigationService           : 
+## OLLAMA METRICS
+Scenario: unknown
+Model: qwen2.5:3b
+Vision: false
+Prompt chars: 4939
+Prompt build time: 0 ms
+HTTP duration: 10744 ms
+Parse time: 48 ms
+Total duration: 10792 ms
+Prompt tokens: 1120
+Output tokens: 341
+Retry: false
+
+2026-09-23T13:16:16.368+05:30  INFO 20279 --- [bug-investigation-agent] [ionShutdownHook] o.s.boot.tomcat.GracefulShutdown         : Commencing graceful shutdown. Waiting for active requests to complete
+2026-09-23T13:16:16.372+05:30  INFO 20279 --- [bug-investigation-agent] [tomcat-shutdown] o.s.boot.tomcat.GracefulShutdown         : Graceful shutdown complete
