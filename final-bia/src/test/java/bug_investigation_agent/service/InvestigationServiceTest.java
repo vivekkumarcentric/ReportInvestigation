@@ -16,6 +16,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -89,7 +90,7 @@ class InvestigationServiceTest {
         assertThat(outcome.response().getAiClassification()).isEqualTo("AUTOMATION_ISSUE");
         assertThat(outcome.response().getHumanClassification()).isEqualTo("APPLICATION_ISSUE");
         assertThat(outcome.response().getClassification()).isEqualTo("APPLICATION_ISSUE");
-        assertThat(outcome.response().getSource()).isEqualTo(FailureFeedbackService.SOURCE_HUMAN_CORRECTED);
+        assertThat(outcome.response().getSource()).isEqualTo(FailureFeedbackService.SOURCE_HISTORICAL);
         assertThat(outcome.response().getRootCauseType()).isEqualTo("CONFIRMED");
         assertThat(outcome.response().getSeverity()).isEqualTo("HIGH");
         assertThat(outcome.response().getRecommendedAction()).isEqualTo("Escalate to app team");
@@ -112,7 +113,7 @@ class InvestigationServiceTest {
     void noHistoricalClassification_fallsThroughToOllama() {
         InvestigationRequest request = request();
         when(failureFeedbackService.getFeedbackByFailureId(anyString())).thenReturn(Optional.empty());
-        when(promptBuilder.buildPrompt(any(InvestigationRequest.class))).thenReturn("prompt text");
+        when(promptBuilder.buildPrompt(any(InvestigationRequest.class), nullable(String.class))).thenReturn("prompt text");
                 when(failureFeedbackService.getClassification(anyString())).thenReturn(Optional.empty());
 
         String json = "{"
@@ -168,7 +169,7 @@ class InvestigationServiceTest {
                 assertThat(outcome.response().getAiClassification()).isEqualTo("AUTOMATION_ISSUE");
                 assertThat(outcome.response().getHumanClassification()).isNull();
                 assertThat(outcome.response().getClassification()).isEqualTo("AUTOMATION_ISSUE");
-                assertThat(outcome.response().getSource()).isEqualTo(FailureFeedbackService.SOURCE_AI);
+                assertThat(outcome.response().getSource()).isEqualTo(FailureFeedbackService.SOURCE_HISTORICAL);
                 assertThat(outcome.response().getRootCauseType()).isEqualTo("PROBABLE");
                 assertThat(outcome.callMetrics()).isEmpty();
 
@@ -203,7 +204,7 @@ class InvestigationServiceTest {
                 });
         when(failureFeedbackService.getFeedbackByFailureId(legacyFailureId)).thenReturn(Optional.of(legacy));
         when(failureFeedbackService.isAnalysisComplete(legacy)).thenReturn(false);
-        when(promptBuilder.buildPrompt(any(InvestigationRequest.class))).thenReturn("prompt text");
+        when(promptBuilder.buildPrompt(any(InvestigationRequest.class), nullable(String.class))).thenReturn("prompt text");
         when(failureFeedbackService.getClassification(anyString())).thenReturn(Optional.empty());
         String json = "{"
                 + "\"classification\":\"AUTOMATION_ISSUE\","
@@ -220,7 +221,7 @@ class InvestigationServiceTest {
 
         assertThat(outcome.response().getFailureId()).isEqualTo(newFailureId);
         assertThat(outcome.response().getClassification()).isEqualTo("AUTOMATION_ISSUE");
-        assertThat(outcome.response().getSource()).isEqualTo(FailureFeedbackService.SOURCE_AI);
+        assertThat(outcome.response().getSource()).isEqualTo(FailureFeedbackService.SOURCE_AI_ENRICHED);
         assertThat(outcome.callMetrics()).hasSize(1);
 
         verify(failureFeedbackService).copyFeedbackToFailureId(legacy, newFailureId);
@@ -243,7 +244,7 @@ class InvestigationServiceTest {
 
                 when(failureFeedbackService.getFeedbackByFailureId(failureId)).thenReturn(Optional.of(historical));
                 when(failureFeedbackService.isAnalysisComplete(historical)).thenReturn(false);
-                when(promptBuilder.buildPrompt(any(InvestigationRequest.class))).thenReturn("prompt text");
+                when(promptBuilder.buildPrompt(any(InvestigationRequest.class), nullable(String.class))).thenReturn("prompt text");
                 when(failureFeedbackService.getClassification(anyString())).thenReturn(Optional.empty());
                 String json = "{"
                         + "\"classification\":\"AUTOMATION_ISSUE\","
@@ -271,7 +272,7 @@ class InvestigationServiceTest {
                 InvestigationRequest request = request();
                 request.setForceReanalysis(true);
 
-                when(promptBuilder.buildPrompt(any(InvestigationRequest.class))).thenReturn("prompt text");
+                when(promptBuilder.buildPrompt(any(InvestigationRequest.class), nullable(String.class))).thenReturn("prompt text");
                 when(failureFeedbackService.getClassification(anyString())).thenReturn(Optional.empty());
                 String json = "{"
                         + "\"classification\":\"AUTOMATION_ISSUE\"," 
@@ -302,7 +303,7 @@ class InvestigationServiceTest {
                 String failureId = FailureIdGenerator.generate(
                         forcedRequest.getScenario(), forcedRequest.getFeature(), forcedRequest.getFailedStep(), forcedRequest.getError());
 
-                when(promptBuilder.buildPrompt(any(InvestigationRequest.class))).thenReturn("prompt text");
+                when(promptBuilder.buildPrompt(any(InvestigationRequest.class), nullable(String.class))).thenReturn("prompt text");
                 when(failureFeedbackService.getClassification(anyString())).thenReturn(Optional.empty());
 
                 String freshJson = "{"

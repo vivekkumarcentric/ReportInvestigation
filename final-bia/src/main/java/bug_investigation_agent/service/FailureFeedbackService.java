@@ -40,6 +40,7 @@ public class FailureFeedbackService {
 
     public static final String SOURCE_AI = "AI";
     public static final String SOURCE_HISTORICAL = "HISTORICAL"; // cross-report similarity match (see findHistoricalMatch)
+    public static final String SOURCE_AI_ENRICHED = "AI_ENRICHED";
     public static final String SOURCE_HUMAN_CORRECTED = "HUMAN_CORRECTED";
 
     /** Must match the classification values the AI is instructed to return (see
@@ -453,6 +454,7 @@ public class FailureFeedbackService {
             return false;
         }
         return feedback.getRootCauseType() != null
+                && isRootCauseMeaningful(feedback.getRootCause())
                 && feedback.getSeverity() != null
                 && feedback.getRecommendedAction() != null
                 && feedback.getSuggestedFix() != null
@@ -463,6 +465,26 @@ public class FailureFeedbackService {
                 && feedback.getPreventionTipsJson() != null
                 && feedback.getStepsToReproduceJson() != null
                 && feedback.getSource() != null;
+    }
+
+    private boolean isRootCauseMeaningful(String rootCause) {
+        if (rootCause == null || rootCause.isBlank()) {
+            return false;
+        }
+        String normalized = rootCause.trim().toLowerCase();
+        if (normalized.startsWith("result loaded from previously saved failure details")) {
+            return false;
+        }
+        if (normalized.contains("there may be a delay in page loading")
+                || normalized.contains("there may be a network issue")
+                || normalized.contains("the element was not visible")) {
+            return false;
+        }
+        if (normalized.startsWith("timeoutexception")
+                && (normalized.contains("delay in page loading") || normalized.contains("element visibility"))) {
+            return false;
+        }
+        return true;
     }
 
     private String toJsonArray(List<String> values) {

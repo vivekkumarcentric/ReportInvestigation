@@ -331,7 +331,7 @@ class FailureFeedbackServiceTest {
     }
 
     @Test
-    void blankRootCause_fromAiIsStillMarkedComplete() {
+    void blankRootCause_fromAiIsMarkedIncompleteForEnrichment() {
         InvestigationResponse response = new InvestigationResponse();
         response.setClassification("UNKNOWN");
         response.setRootCause("");
@@ -352,7 +352,7 @@ class FailureFeedbackServiceTest {
 
         FailureFeedback saved = failureFeedbackService.getFeedbackByFailureId("f-blank-root").orElseThrow();
         assertThat(saved.getRootCause()).isEmpty();
-        assertThat(failureFeedbackService.isAnalysisComplete(saved)).isTrue();
+        assertThat(failureFeedbackService.isAnalysisComplete(saved)).isFalse();
     }
 }
 

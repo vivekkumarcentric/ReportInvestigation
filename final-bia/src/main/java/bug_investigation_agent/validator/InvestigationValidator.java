@@ -52,9 +52,9 @@ public class InvestigationValidator {
 
         if (!type.equals("CONFIRMED")
                 && !type.equals("PROBABLE")
-                && !type.equals("UNKNOWN")) {
+                && !type.equals("POSSIBLE")) {
 
-            response.setRootCauseType("UNKNOWN");
+            response.setRootCauseType("POSSIBLE");
         } else {
             response.setRootCauseType(type);
         }

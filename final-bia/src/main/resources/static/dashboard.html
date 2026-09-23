@@ -665,6 +665,34 @@
             color: var(--gray-700);
         }
 
+        .analysis-source-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.22rem 0.55rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+        }
+
+        .analysis-source-badge.historical {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .analysis-source-badge.ai-analysis {
+            background: #e0f2fe;
+            color: #0c4a6e;
+        }
+
+        .analysis-source-badge.ai-enriched {
+            background: #ede9fe;
+            color: #5b21b6;
+        }
+
         .failure-count-badge {
             background: var(--primary);
             color: white;
@@ -1463,6 +1491,7 @@
                         <tr>
                             <th>Test Case / Scenario</th>
                             <th>Status</th>
+                            <th>Analysis Source</th>
                             <th>Classification</th>
                             <th>Root Cause</th>
                             <th>Confidence</th>
@@ -2342,7 +2371,7 @@
 
             count.textContent = `${filteredFailures.length} failed test${filteredFailures.length === 1 ? '' : 's'}`;
             if (!filteredFailures.length) {
-                body.innerHTML = `<tr><td colspan="6" class="empty-table">No failed tests found for the current filters.</td></tr>`;
+                body.innerHTML = `<tr><td colspan="7" class="empty-table">No failed tests found for the current filters.</td></tr>`;
                 return;
             }
 
@@ -2350,6 +2379,7 @@
                 const rootCause = firstText(failure?.aiAnalysis?.rootCause, firstText(failure.reason, firstText(failure.error, 'N/A')));
                 const confidenceRaw = Number(failure.confidence);
                 const confidence = !isNaN(confidenceRaw) && confidenceRaw > 0 ? `${Math.round(confidenceRaw)}%` : 'N/A';
+                const sourceMeta = analysisSourceMeta(failure.classificationSource);
                 return `
                     <tr data-failure-id="${failure._failureId}">
                         <td>
@@ -2357,6 +2387,7 @@
                             ${failure.feature ? `<div class="text-muted" style="font-size:0.8rem;">${escapeHtml(failure.feature)}</div>` : ''}
                         </td>
                         <td><span class="modal-badge" style="background:#fee2e2;color:#991b1b;">${escapeHtml((failure.status || 'N/A').toUpperCase())}</span></td>
+                        <td><span class="analysis-source-badge ${sourceMeta.className}"><i class="fas fa-${sourceMeta.icon}" aria-hidden="true"></i>${escapeHtml(sourceMeta.label)}</span></td>
                         <td><span class="classification-badge ${failure.classification || 'unknown'}">${escapeHtml(classificationTitle(failure.classification))}</span></td>
                         <td>${escapeHtml(rootCause || 'N/A')}</td>
                         <td><span class="confidence-pill">${escapeHtml(confidence)}</span></td>
@@ -2383,6 +2414,23 @@
                 environment: 'Environment Issue',
                 unknown: 'Unknown'
             }[classification] || 'Unknown';
+        }
+
+        function normalizeAnalysisSource(source) {
+            const raw = firstText(source, 'AI');
+            if (raw === 'HISTORICAL') return 'HISTORICAL';
+            if (raw === 'AI_ENRICHED') return 'AI_ENRICHED';
+            if (raw === 'HUMAN_CORRECTED') return 'HISTORICAL';
+            return 'AI_ANALYSIS';
+        }
+
+        function analysisSourceMeta(source) {
+            const normalized = normalizeAnalysisSource(source);
+            return {
+                HISTORICAL: { label: 'HISTORICAL', className: 'historical', icon: 'database' },
+                AI_ANALYSIS: { label: 'AI ANALYSIS', className: 'ai-analysis', icon: 'robot' },
+                AI_ENRICHED: { label: 'AI ENRICHED', className: 'ai-enriched', icon: 'wand-magic-sparkles' }
+            }[normalized] || { label: 'AI ANALYSIS', className: 'ai-analysis', icon: 'robot' };
         }
 
         function createFailureGroupElement(group, index) {
@@ -2498,6 +2546,7 @@
 
         const CLASSIFICATION_SOURCE_LABELS = {
             AI: 'AI Analysis',
+            AI_ENRICHED: 'AI Enriched',
             HUMAN_CORRECTED: 'Human Corrected',
             HISTORICAL: 'Historical Knowledge'
         };
