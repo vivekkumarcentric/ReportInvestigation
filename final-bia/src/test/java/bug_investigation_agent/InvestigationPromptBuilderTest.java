@@ -22,7 +22,7 @@ class InvestigationPromptBuilderTest {
 
         assertTrue(prompt.contains("15,699"));
         assertTrue(prompt.contains("CommonPage.userSelectPhotoBySelectingPhotoLibrary"));
-        assertTrue(prompt.contains("PRESENT (embedded image"));
+        assertTrue(prompt.contains("AN IMAGE IS ATTACHED TO THIS REQUEST"));
         assertFalse(prompt.contains("data:image/png;base64," + "A".repeat(1000)));
     }
 }

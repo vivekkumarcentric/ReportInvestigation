@@ -7,6 +7,10 @@ import org.springframework.stereotype.Component;
 public class InvestigationPromptBuilder {
 
     public String buildPrompt(InvestigationRequest request) {
+        return buildPrompt(request, null);
+    }
+
+    public String buildPrompt(InvestigationRequest request, String historicalContext) {
         boolean hasImage = request != null
                 && request.getFailureImage() != null
                 && request.getFailureImage().trim().startsWith("data:image/");
@@ -27,23 +31,31 @@ public class InvestigationPromptBuilder {
                 """
                 : """
                 Screenshot:
-                NOT PROVIDED - root cause type cannot be CONFIRMED without visual evidence.
+                                NOT PROVIDED - root cause type cannot be CONFIRMED without visual evidence.
                 """;
+
+                String historicalSection = (historicalContext == null || historicalContext.isBlank())
+                                ? "NOT PROVIDED"
+                                : historicalContext.trim();
 
         return """
                 You are a Senior SDET specializing in Selenium, Appium, Cucumber, TestNG and mobile/web automation failure investigation.
-                Provide a CONFIRMED root cause wherever possible, using ALL evidence together (step history, error, stack trace, screenshot).
+                                Generate a specific, evidence-based technical root cause using ALL available evidence together
+                                (test/scenario context, failed step, error, stack trace, locator hints, screenshot, and historical context when present).
 
                 CONFIRMATION RULES:
                 - CONFIRMED: screenshot + error/stack trace together prove the cause.
                 - PROBABLE: error/stack trace alone strongly suggest the cause, no visual proof.
-                - UNKNOWN: insufficient evidence.
+                                - POSSIBLE: evidence is limited or partially conflicting.
 
                 RULES:
                 - Use ONLY the evidence below. NEVER invent file/class/method names, selectors, endpoints or log types not present in it.
                 - Read ALL steps for context; root cause may be in an earlier passed step, not just the failed one.
-                - TimeoutException/NoSuchElementException are SYMPTOMS, not root causes — dig deeper. Never suggest increasing timeout
-                  unless evidence shows a loading/sync delay.
+                                - TimeoutException/NoSuchElementException are SYMPTOMS, not root causes. Explain WHY the wait/lookup failed in this test.
+                                - Do not auto-assume timeouts are application slowness. For locator-related failures, analyze locator stability,
+                                    resource-id/content-desc usage, hierarchy changes, wrong screen/state, and whether the expected element is actually visible.
+                                - Correlate stack trace call sites with screenshot state and the failed step. Root cause must reference this correlation.
+                                - If evidence is insufficient, explicitly say "The evidence indicates..." / "The most likely cause is..." and use POSSIBLE.
                 - Examine the screenshot for: error dialogs, toasts, wrong screen/state, missing/blank elements, incorrect data, spinners,
                   network banners, or any visual anomaly. Use it to confirm/refute the hypothesis.
                 - Do not default to AUTOMATION_ISSUE. Simple locator-not-found with nothing else wrong = AUTOMATION_ISSUE. But if an
@@ -58,8 +70,8 @@ public class InvestigationPromptBuilder {
                 OUTPUT FIELDS (JSON only, no markdown, no extra text):
                 {
                   "classification": "AUTOMATION_ISSUE|APPLICATION_ISSUE|API_ISSUE|DATA_ISSUE|ENVIRONMENT_ISSUE|NETWORK_ISSUE|UNKNOWN",
-                  "rootCauseType": "CONFIRMED|PROBABLE|UNKNOWN",
-                  "rootCause": "detailed cause, which layer is responsible, reference step numbers",
+                                    "rootCauseType": "CONFIRMED|PROBABLE|POSSIBLE",
+                                    "rootCause": "1-3 concise sentences: specific technical cause + concrete evidence correlation (error/stack/screenshot/step)",
                   "confidence": 0,
                   "evidence": ["specific evidence strings: quoted error, step refs, screenshot content, stack trace lines"],
                   "missingEvidence": ["info that would help, appropriate to the platform actually used (mobile: device logs, Appium session log, backend logs; web: browser console, network HAR)"],
@@ -71,8 +83,9 @@ public class InvestigationPromptBuilder {
                   "similarPatterns": "1-2 look-alike failure patterns and how they differ from this one",
                   "screenshotObservation": "exact screen/state/errors/elements seen in the screenshot, or 'No screenshot provided - cannot visually confirm root cause' if none"
                 }
-                Confidence guide: CONFIRMED+screenshot 85-95, CONFIRMED from trace only 75-85, PROBABLE 60-75, UNKNOWN 20-40.
+                                Confidence guide: CONFIRMED+screenshot 85-95, CONFIRMED from trace only 75-85, PROBABLE 60-75, POSSIBLE 35-60.
                 Never leave recommendedAction/suggestedFix empty or generic.
+                                Never output a generic rootCause that just restates the exception.
 
                 ==================== FAILURE EVIDENCE ====================
                 Test Case ID   : %s
@@ -98,6 +111,9 @@ public class InvestigationPromptBuilder {
                 --- VIDEO EVIDENCE ---
                 %s
 
+                --- HISTORICAL CONTEXT (supporting only; may be stale/incomplete) ---
+                %s
+
                 --- %s
                 ================== END FAILURE EVIDENCE ==================
 
@@ -116,6 +132,7 @@ public class InvestigationPromptBuilder {
                 buildStackTraceSection(request),
                 limit(request == null ? null : request.getConsoleLogs(), 1200),
                 safe(request == null ? null : request.getVideoUrl()),
+                historicalSection,
                 imageSection
         );
     }

@@ -74,12 +74,14 @@ public class InvestigationService {
                 request == null ? null : request.getError());
 
         boolean historicalFound = false;
+        FailureFeedback historicalContextRecord = null;
         if (forceReanalysis) {
             log.info("Force re-analysis requested for failureId={}. Bypassing historical analysis.", failureId);
         } else {
             Optional<FailureFeedback> exactMatch = failureFeedbackService.getFeedbackByFailureId(failureId);
             if (exactMatch.isPresent()) {
                 historicalFound = true;
+                historicalContextRecord = exactMatch.get();
                 if (failureFeedbackService.isAnalysisComplete(exactMatch.get())) {
                     log.info("Complete historical analysis found for failureId={}. Returning persisted result.", failureId);
                     return buildHistoricalOutcomeFromFeedback(failureId, exactMatch.get());
@@ -91,8 +93,12 @@ public class InvestigationService {
                 Optional<FailureFeedback> legacyMatch = failureFeedbackService.getFeedbackByFailureId(legacyFailureId);
                 if (legacyMatch.isPresent()) {
                     historicalFound = true;
+                    historicalContextRecord = legacyMatch.get();
                     failureFeedbackService.copyFeedbackToFailureId(legacyMatch.get(), failureId);
                     Optional<FailureFeedback> aliased = failureFeedbackService.getFeedbackByFailureId(failureId);
+                    if (aliased.isPresent()) {
+                        historicalContextRecord = aliased.get();
+                    }
                     if (aliased.isPresent() && failureFeedbackService.isAnalysisComplete(aliased.get())) {
                         log.info("Complete historical analysis found for failureId={}. Returning persisted result.", failureId);
                         return buildHistoricalOutcomeFromFeedback(failureId, aliased.get());
@@ -107,7 +113,7 @@ public class InvestigationService {
         }
 
         long promptBuildStart = System.nanoTime();
-        String prompt = promptBuilder.buildPrompt(request);
+        String prompt = promptBuilder.buildPrompt(request, buildHistoricalPromptContext(historicalContextRecord));
         long promptBuildMillis = (System.nanoTime() - promptBuildStart) / 1_000_000;
 
         String image = request == null ? null : request.getFailureImage();
@@ -136,7 +142,7 @@ public class InvestigationService {
                 InvestigationResponse parsed = objectMapper.readValue(json, InvestigationResponse.class);
                 correctHallucinatedScreenshotText(parsed, image);
                 log.info("Updating existing failure record: {}", failureId);
-                applyHumanFeedback(failureId, request, parsed);
+                applyHumanFeedback(failureId, request, parsed, historicalFound);
                 log.info("Updated historical analysis for failureId={} with enriched AI result.", failureId);
 
                 long parseMillis = (System.nanoTime() - parseStart) / 1_000_000;
@@ -187,13 +193,9 @@ public class InvestigationService {
         response.setAiClassification(ai);
         response.setHumanClassification(hasHuman ? human : null);
         response.setClassification(effective);
-        if (feedback.getSource() != null && !feedback.getSource().isBlank()) {
-            response.setSource(feedback.getSource());
-        } else {
-            response.setSource(hasHuman
-                    ? FailureFeedbackService.SOURCE_HUMAN_CORRECTED
-                    : FailureFeedbackService.SOURCE_HISTORICAL);
-        }
+        // This branch is only reached when we short-circuit to a complete persisted result.
+        // The analysis source for this execution path is always historical retrieval.
+        response.setSource(FailureFeedbackService.SOURCE_HISTORICAL);
 
         if (feedback.getConfidence() != null) {
             response.setConfidence(feedback.getConfidence());
@@ -243,6 +245,31 @@ public class InvestigationService {
         return "unknown";
     }
 
+    private String buildHistoricalPromptContext(FailureFeedback feedback) {
+        if (feedback == null) {
+            return "NOT PROVIDED";
+        }
+        StringBuilder context = new StringBuilder();
+        appendIfPresent(context, "Previous Source", feedback.getSource());
+        appendIfPresent(context, "Previous AI Classification", feedback.getAiClassification());
+        appendIfPresent(context, "Previous Human Classification", feedback.getHumanClassification());
+        appendIfPresent(context, "Previous Root Cause", feedback.getRootCause());
+        appendIfPresent(context, "Previous Root Cause Type", feedback.getRootCauseType());
+        appendIfPresent(context, "Previous Similar Patterns", feedback.getSimilarPatterns());
+        appendIfPresent(context, "Previous Screenshot Observation", feedback.getScreenshotObservation());
+        return context.isEmpty() ? "NOT PROVIDED" : context.toString().trim();
+    }
+
+    private void appendIfPresent(StringBuilder context, String label, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        if (!context.isEmpty()) {
+            context.append('\n');
+        }
+        context.append(label).append(": ").append(value.trim());
+    }
+
     /**
      * Computes a stable {@code failureId} for this request, persists the AI's classification as
      * the baseline for that failure (never overwriting any existing human correction), and then
@@ -254,7 +281,10 @@ public class InvestigationService {
      * {@link #investigateWithMetrics(InvestigationRequest, String)}) rather than recomputed here,
      * since the historical-lookup short-circuit needs the same id before Ollama is even called.</p>
      */
-    private void applyHumanFeedback(String failureId, InvestigationRequest request, InvestigationResponse response) {
+    private void applyHumanFeedback(String failureId,
+                                    InvestigationRequest request,
+                                    InvestigationResponse response,
+                                    boolean historicalFound) {
         if (response == null) {
             return;
         }
@@ -262,7 +292,9 @@ public class InvestigationService {
         response.setFailureId(failureId);
         response.setAiClassification(response.getClassification());
         response.setHumanClassification(null);
-        response.setSource(FailureFeedbackService.SOURCE_AI);
+        response.setSource(historicalFound
+            ? FailureFeedbackService.SOURCE_AI_ENRICHED
+            : FailureFeedbackService.SOURCE_AI);
 
         failureFeedbackService.recordAiResult(failureId, request, response);
 
@@ -271,7 +303,6 @@ public class InvestigationService {
         existing.ifPresent(feedback -> {
             if (feedback.getHumanClassification() != null && !feedback.getHumanClassification().isBlank()) {
                 response.setHumanClassification(feedback.getHumanClassification());
-                response.setSource(FailureFeedbackService.SOURCE_HUMAN_CORRECTED);
                 response.setClassification(feedback.getHumanClassification());
             }
         });
