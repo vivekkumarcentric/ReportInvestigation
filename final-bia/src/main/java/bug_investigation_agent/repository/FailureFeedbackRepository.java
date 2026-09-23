@@ -15,8 +15,12 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
 
 /**
  * Plain-JDBC (no Spring Data JPA, no migration framework) SQLite persistence for
@@ -44,11 +48,38 @@ public class FailureFeedbackRepository {
                 ai_classification TEXT,
                 human_classification TEXT,
                 root_cause TEXT,
+                root_cause_type TEXT,
+                severity TEXT,
+                recommended_action TEXT,
+                suggested_fix TEXT,
+                similar_patterns TEXT,
+                screenshot_observation TEXT,
+                evidence_json TEXT,
+                missing_evidence_json TEXT,
+                prevention_tips_json TEXT,
+                steps_to_reproduce_json TEXT,
+                source TEXT,
                 confidence INTEGER,
                 created_at TEXT,
                 updated_at TEXT
             )
             """;
+
+    private static final Map<String, String> MIGRATION_COLUMNS = new LinkedHashMap<>();
+
+    static {
+        MIGRATION_COLUMNS.put("root_cause_type", "TEXT");
+        MIGRATION_COLUMNS.put("severity", "TEXT");
+        MIGRATION_COLUMNS.put("recommended_action", "TEXT");
+        MIGRATION_COLUMNS.put("suggested_fix", "TEXT");
+        MIGRATION_COLUMNS.put("similar_patterns", "TEXT");
+        MIGRATION_COLUMNS.put("screenshot_observation", "TEXT");
+        MIGRATION_COLUMNS.put("evidence_json", "TEXT");
+        MIGRATION_COLUMNS.put("missing_evidence_json", "TEXT");
+        MIGRATION_COLUMNS.put("prevention_tips_json", "TEXT");
+        MIGRATION_COLUMNS.put("steps_to_reproduce_json", "TEXT");
+        MIGRATION_COLUMNS.put("source", "TEXT");
+    }
 
     private final String jdbcUrl;
 
@@ -70,10 +101,38 @@ public class FailureFeedbackRepository {
         try (Connection connection = openConnection();
              Statement statement = connection.createStatement()) {
             statement.execute(TABLE_DDL);
+            migrateSchema(connection);
         } catch (SQLException e) {
             log.error("Failed to initialize failure_feedback schema: {}", e.getMessage(), e);
             throw new IllegalStateException("Failed to initialize failure feedback database", e);
         }
+    }
+
+    private void migrateSchema(Connection connection) throws SQLException {
+        Set<String> existingColumns = loadExistingColumns(connection);
+        try (Statement statement = connection.createStatement()) {
+            for (Map.Entry<String, String> entry : MIGRATION_COLUMNS.entrySet()) {
+                String column = entry.getKey();
+                if (!existingColumns.contains(column.toLowerCase())) {
+                    statement.execute("ALTER TABLE failure_feedback ADD COLUMN " + column + " " + entry.getValue());
+                    log.info("Migrated failure_feedback schema: added missing column {}", column);
+                }
+            }
+        }
+    }
+
+    private Set<String> loadExistingColumns(Connection connection) throws SQLException {
+        Set<String> columns = new HashSet<>();
+        try (Statement statement = connection.createStatement();
+             ResultSet rs = statement.executeQuery("PRAGMA table_info(failure_feedback)")) {
+            while (rs.next()) {
+                String name = rs.getString("name");
+                if (name != null) {
+                    columns.add(name.toLowerCase());
+                }
+            }
+        }
+        return columns;
     }
 
     private Connection openConnection() throws SQLException {
@@ -141,9 +200,12 @@ public class FailureFeedbackRepository {
                 INSERT INTO failure_feedback (
                     failure_id, scenario_name, feature_name, failed_step_line, normalized_step,
                     normalized_error, exception_type, locator, stack_trace_pattern,
-                    ai_classification, human_classification, root_cause, confidence,
-                    created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ai_classification, human_classification, root_cause, root_cause_type,
+                    severity, recommended_action, suggested_fix, similar_patterns,
+                    screenshot_observation, evidence_json, missing_evidence_json,
+                    prevention_tips_json, steps_to_reproduce_json, source,
+                    confidence, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(failure_id) DO UPDATE SET
                     scenario_name = excluded.scenario_name,
                     feature_name = excluded.feature_name,
@@ -156,6 +218,17 @@ public class FailureFeedbackRepository {
                     ai_classification = excluded.ai_classification,
                     human_classification = excluded.human_classification,
                     root_cause = excluded.root_cause,
+                    root_cause_type = excluded.root_cause_type,
+                    severity = excluded.severity,
+                    recommended_action = excluded.recommended_action,
+                    suggested_fix = excluded.suggested_fix,
+                    similar_patterns = excluded.similar_patterns,
+                    screenshot_observation = excluded.screenshot_observation,
+                    evidence_json = excluded.evidence_json,
+                    missing_evidence_json = excluded.missing_evidence_json,
+                    prevention_tips_json = excluded.prevention_tips_json,
+                    steps_to_reproduce_json = excluded.steps_to_reproduce_json,
+                    source = excluded.source,
                     confidence = excluded.confidence,
                     updated_at = excluded.updated_at
                 """;
@@ -173,13 +246,24 @@ public class FailureFeedbackRepository {
             statement.setString(10, feedback.getAiClassification());
             statement.setString(11, feedback.getHumanClassification());
             statement.setString(12, feedback.getRootCause());
+            statement.setString(13, feedback.getRootCauseType());
+            statement.setString(14, feedback.getSeverity());
+            statement.setString(15, feedback.getRecommendedAction());
+            statement.setString(16, feedback.getSuggestedFix());
+            statement.setString(17, feedback.getSimilarPatterns());
+            statement.setString(18, feedback.getScreenshotObservation());
+            statement.setString(19, feedback.getEvidenceJson());
+            statement.setString(20, feedback.getMissingEvidenceJson());
+            statement.setString(21, feedback.getPreventionTipsJson());
+            statement.setString(22, feedback.getStepsToReproduceJson());
+            statement.setString(23, feedback.getSource());
             if (feedback.getConfidence() != null) {
-                statement.setInt(13, feedback.getConfidence());
+                statement.setInt(24, feedback.getConfidence());
             } else {
-                statement.setNull(13, java.sql.Types.INTEGER);
+                statement.setNull(24, java.sql.Types.INTEGER);
             }
-            statement.setString(14, toText(feedback.getCreatedAt()));
-            statement.setString(15, toText(feedback.getUpdatedAt()));
+            statement.setString(25, toText(feedback.getCreatedAt()));
+            statement.setString(26, toText(feedback.getUpdatedAt()));
             statement.executeUpdate();
         } catch (SQLException e) {
             log.error("Failed to save failure feedback for failureId={}: {}",
@@ -210,6 +294,17 @@ public class FailureFeedbackRepository {
         feedback.setAiClassification(rs.getString("ai_classification"));
         feedback.setHumanClassification(rs.getString("human_classification"));
         feedback.setRootCause(rs.getString("root_cause"));
+        feedback.setRootCauseType(rs.getString("root_cause_type"));
+        feedback.setSeverity(rs.getString("severity"));
+        feedback.setRecommendedAction(rs.getString("recommended_action"));
+        feedback.setSuggestedFix(rs.getString("suggested_fix"));
+        feedback.setSimilarPatterns(rs.getString("similar_patterns"));
+        feedback.setScreenshotObservation(rs.getString("screenshot_observation"));
+        feedback.setEvidenceJson(rs.getString("evidence_json"));
+        feedback.setMissingEvidenceJson(rs.getString("missing_evidence_json"));
+        feedback.setPreventionTipsJson(rs.getString("prevention_tips_json"));
+        feedback.setStepsToReproduceJson(rs.getString("steps_to_reproduce_json"));
+        feedback.setSource(rs.getString("source"));
         int confidence = rs.getInt("confidence");
         feedback.setConfidence(rs.wasNull() ? null : confidence);
         feedback.setCreatedAt(parseInstant(rs.getString("created_at")));

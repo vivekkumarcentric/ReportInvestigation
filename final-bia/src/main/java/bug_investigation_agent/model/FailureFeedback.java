@@ -25,6 +25,17 @@ public class FailureFeedback {
     private String aiClassification;
     private String humanClassification;
     private String rootCause;
+    private String rootCauseType;
+    private String severity;
+    private String recommendedAction;
+    private String suggestedFix;
+    private String similarPatterns;
+    private String screenshotObservation;
+    private String evidenceJson;
+    private String missingEvidenceJson;
+    private String preventionTipsJson;
+    private String stepsToReproduceJson;
+    private String source;
     private Integer confidence;
     private Instant createdAt;
     private Instant updatedAt;
@@ -123,6 +134,94 @@ public class FailureFeedback {
 
     public void setRootCause(String rootCause) {
         this.rootCause = rootCause;
+    }
+
+    public String getRootCauseType() {
+        return rootCauseType;
+    }
+
+    public void setRootCauseType(String rootCauseType) {
+        this.rootCauseType = rootCauseType;
+    }
+
+    public String getSeverity() {
+        return severity;
+    }
+
+    public void setSeverity(String severity) {
+        this.severity = severity;
+    }
+
+    public String getRecommendedAction() {
+        return recommendedAction;
+    }
+
+    public void setRecommendedAction(String recommendedAction) {
+        this.recommendedAction = recommendedAction;
+    }
+
+    public String getSuggestedFix() {
+        return suggestedFix;
+    }
+
+    public void setSuggestedFix(String suggestedFix) {
+        this.suggestedFix = suggestedFix;
+    }
+
+    public String getSimilarPatterns() {
+        return similarPatterns;
+    }
+
+    public void setSimilarPatterns(String similarPatterns) {
+        this.similarPatterns = similarPatterns;
+    }
+
+    public String getScreenshotObservation() {
+        return screenshotObservation;
+    }
+
+    public void setScreenshotObservation(String screenshotObservation) {
+        this.screenshotObservation = screenshotObservation;
+    }
+
+    public String getEvidenceJson() {
+        return evidenceJson;
+    }
+
+    public void setEvidenceJson(String evidenceJson) {
+        this.evidenceJson = evidenceJson;
+    }
+
+    public String getMissingEvidenceJson() {
+        return missingEvidenceJson;
+    }
+
+    public void setMissingEvidenceJson(String missingEvidenceJson) {
+        this.missingEvidenceJson = missingEvidenceJson;
+    }
+
+    public String getPreventionTipsJson() {
+        return preventionTipsJson;
+    }
+
+    public void setPreventionTipsJson(String preventionTipsJson) {
+        this.preventionTipsJson = preventionTipsJson;
+    }
+
+    public String getStepsToReproduceJson() {
+        return stepsToReproduceJson;
+    }
+
+    public void setStepsToReproduceJson(String stepsToReproduceJson) {
+        this.stepsToReproduceJson = stepsToReproduceJson;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
     }
 
     public Integer getConfidence() {

@@ -10,12 +10,13 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
     <style>
         :root {
-            --primary: #2563eb;
-            --secondary: #7c3aed;
+            --primary: #3657d6;
+            --secondary: #6d4dd6;
             --success: #10b981;
             --danger: #ef4444;
             --warning: #f59e0b;
             --info: #3b82f6;
+            --surface: #ffffff;
             --gray-50: #f9fafb;
             --gray-100: #f3f4f6;
             --gray-200: #e5e7eb;
@@ -34,31 +35,36 @@
 
         body {
             font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background:
+                radial-gradient(circle at top right, rgba(109, 77, 214, 0.2), transparent 42%),
+                radial-gradient(circle at top left, rgba(54, 87, 214, 0.2), transparent 40%),
+                linear-gradient(180deg, #eef3ff 0%, #f8f7ff 100%);
             min-height: 100vh;
             color: var(--gray-900);
         }
 
         .main-container {
-            max-width: 1400px;
+            max-width: 1440px;
             margin: 0 auto;
-            padding: 2rem;
+            padding: 1.5rem;
         }
 
         /* Dashboard Header */
         .dashboard-header {
-            background: white;
-            border-radius: 16px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            background: var(--surface);
+            border-radius: 18px;
+            padding: 1.5rem;
+            margin-bottom: 1.25rem;
+            box-shadow: 0 8px 26px -20px rgba(22, 34, 69, 0.35);
+            border: 1px solid rgba(152, 167, 219, 0.2);
         }
 
         .dashboard-header h1 {
-            font-size: 2rem;
+            font-size: 1.85rem;
             font-weight: 800;
             color: var(--gray-900);
             margin: 0;
+            letter-spacing: -0.02em;
         }
 
         .dashboard-header p {
@@ -66,27 +72,70 @@
             margin: 0.5rem 0 0 0;
         }
 
+        .header-layout {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .header-meta {
+            margin-top: 0.85rem;
+            display: flex;
+            gap: 0.65rem;
+            flex-wrap: wrap;
+        }
+
+        .meta-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.4rem 0.7rem;
+            border-radius: 999px;
+            background: #eef2ff;
+            color: #4338ca;
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+
+        .header-action-btn {
+            border: none;
+            padding: 0.75rem 1rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: #fff;
+            border-radius: 10px;
+            font-weight: 600;
+            box-shadow: 0 12px 24px -18px rgba(54, 87, 214, 0.85);
+            white-space: nowrap;
+        }
+
+        .header-action-btn:hover {
+            filter: brightness(1.03);
+        }
+
         /* Upload Screen */
         .upload-screen {
-            background: white;
-            border-radius: 16px;
-            padding: 3rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            background: var(--surface);
+            border-radius: 18px;
+            padding: 2rem;
+            box-shadow: 0 8px 26px -20px rgba(22, 34, 69, 0.35);
             text-align: center;
+            border: 1px solid rgba(152, 167, 219, 0.2);
         }
 
         .upload-area {
-            border: 3px dashed var(--gray-300);
-            border-radius: 12px;
-            padding: 3rem;
+            border: 2px dashed #c7d2fe;
+            border-radius: 14px;
+            padding: 2rem;
             cursor: pointer;
             transition: all 0.3s ease;
-            background: var(--gray-50);
+            background: linear-gradient(180deg, #f8faff 0%, #f6f5ff 100%);
         }
 
         .upload-area:hover {
             border-color: var(--primary);
-            background: #eff6ff;
+            background: #eef2ff;
         }
 
         .upload-area.file-selected {
@@ -95,20 +144,29 @@
         }
 
         .upload-icon {
-            font-size: 4rem;
-            color: var(--gray-400);
-            margin-bottom: 1rem;
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            margin: 0 auto 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.85rem;
+            color: var(--primary);
+            background: rgba(54, 87, 214, 0.12);
         }
 
         .upload-area.file-selected .upload-icon {
             color: var(--success);
+            background: rgba(16, 185, 129, 0.12);
         }
 
         .file-info {
             margin-top: 1rem;
-            padding: 1rem;
-            background: white;
-            border-radius: 8px;
+            padding: 0.9rem;
+            background: #f8fafc;
+            border-radius: 10px;
+            border: 1px solid var(--gray-200);
             display: none;
         }
 
@@ -118,12 +176,12 @@
 
         /* Analysis Button */
         .analyze-btn {
-            margin-top: 2rem;
-            padding: 1rem 3rem;
-            font-size: 1.1rem;
+            margin-top: 1.25rem;
+            padding: 0.95rem 2.2rem;
+            font-size: 1rem;
             font-weight: 600;
             border-radius: 12px;
-            background: var(--primary);
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
             border: none;
             color: white;
             transition: all 0.3s ease;
@@ -140,6 +198,114 @@
             cursor: not-allowed;
         }
 
+        .ado-create-btn {
+            border-radius: 10px;
+            font-weight: 600;
+            min-width: 172px;
+            border-color: rgba(54, 87, 214, 0.35);
+            background: #eef2ff;
+            color: var(--primary);
+            box-shadow: 0 8px 18px -16px rgba(54, 87, 214, 0.9);
+        }
+
+        .ado-create-btn:hover {
+            border-color: rgba(54, 87, 214, 0.7);
+            background: rgba(54, 87, 214, 0.06);
+        }
+
+        .ado-preview-modal .modal-content {
+            border-radius: 20px;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            box-shadow: 0 30px 70px -35px rgba(15, 23, 42, 0.5);
+        }
+
+        .ado-preview-modal .modal-body {
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 1rem 1.1rem 1.25rem;
+        }
+
+        .ado-preview-banner {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.45rem 0.8rem;
+            border-radius: 999px;
+            background: #fff7ed;
+            color: #9a4d00;
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            margin-bottom: 0.9rem;
+        }
+
+        .ado-preview-section {
+            background: #f8fafc;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            border-radius: 14px;
+            padding: 0.95rem 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .ado-preview-section h6 {
+            margin: 0 0 0.65rem;
+            font-size: 0.78rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #475569;
+            font-weight: 700;
+        }
+
+        .ado-preview-value {
+            color: var(--gray-800);
+            line-height: 1.6;
+            word-break: break-word;
+        }
+
+        .ado-preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 0.85rem;
+            margin-top: 0.5rem;
+        }
+
+        .ado-preview-field {
+            background: white;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 12px;
+            padding: 0.75rem 0.85rem;
+        }
+
+        .ado-preview-field label {
+            display: block;
+            margin-bottom: 0.4rem;
+            font-size: 0.74rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: #64748b;
+            font-weight: 700;
+        }
+
+        .ado-preview-field div {
+            color: var(--gray-800);
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .ado-preview-image {
+            max-width: 100%;
+            max-height: 220px;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            margin-top: 0.5rem;
+            background: #f8fafc;
+        }
+
+        .ado-preview-empty {
+            color: #64748b;
+            font-style: italic;
+        }
+
         /* Dashboard View */
         .dashboard-view {
             display: none;
@@ -152,22 +318,28 @@
         /* Stats Cards */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.2rem;
         }
 
         .stat-card {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            background: var(--surface);
+            border-radius: 14px;
+            padding: 1.1rem;
+            box-shadow: 0 10px 24px -22px rgba(22, 34, 69, 0.8);
+            border: 1px solid rgba(144, 159, 212, 0.22);
             transition: all 0.3s ease;
         }
 
+        .stat-card.clickable-card {
+            cursor: pointer;
+        }
+
         .stat-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+            box-shadow: 0 16px 28px -22px rgba(40, 59, 119, 0.8);
+            border-color: rgba(54, 87, 214, 0.3);
         }
 
         .stat-card-header {
@@ -178,47 +350,136 @@
         }
 
         .stat-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: 1.1rem;
         }
 
         .stat-value {
-            font-size: 2rem;
+            font-size: 1.75rem;
             font-weight: 800;
             color: var(--gray-900);
+            line-height: 1.1;
         }
 
         .stat-label {
             color: var(--gray-500);
-            font-size: 0.875rem;
-            font-weight: 500;
+            font-size: 0.76rem;
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
 
-        .stat-change {
-            font-size: 0.875rem;
+        .stat-note {
+            margin-top: 0.45rem;
+            font-size: 0.76rem;
+            color: var(--gray-500);
+        }
+
+        .attention-summary,
+        .executive-summary,
+        .table-section,
+        .failure-groups,
+        .chart-card,
+        .filters-bar {
+            background: var(--surface);
+            border: 1px solid rgba(144, 159, 212, 0.2);
+            border-radius: 14px;
+            box-shadow: 0 8px 24px -20px rgba(22, 34, 69, 0.65);
+        }
+
+        .attention-summary {
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            margin-bottom: 0.75rem;
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        .attention-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.75rem;
+        }
+
+        .attention-item {
+            border-radius: 12px;
+            border: 1px solid var(--gray-200);
+            padding: 0.8rem;
+            background: #fafbff;
+        }
+
+        .attention-label {
+            font-size: 0.74rem;
+            color: var(--gray-500);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-weight: 600;
+        }
+
+        .attention-value {
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: var(--gray-900);
+            line-height: 1.1;
+            margin-top: 0.2rem;
+        }
+
+        .executive-summary {
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .executive-hero {
             margin-top: 0.5rem;
+            padding: 0.85rem 1rem;
+            border-radius: 12px;
+            background: linear-gradient(135deg, rgba(54, 87, 214, 0.12), rgba(109, 77, 214, 0.09));
+            color: #1e1b4b;
+            font-weight: 600;
+        }
+
+        .summary-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.75rem;
+            margin-top: 0.85rem;
+        }
+
+        .summary-metric {
+            background: #f8faff;
+            border: 1px solid var(--gray-200);
+            border-radius: 10px;
+            padding: 0.75rem;
+            font-size: 0.84rem;
+        }
+
+        .summary-metric strong {
+            display: block;
+            color: var(--gray-900);
         }
 
         /* Charts */
         .charts-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
         }
 
         .chart-card {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            padding: 1rem;
         }
 
         .chart-card h3 {
@@ -230,11 +491,8 @@
 
         /* Failure Groups */
         .failure-groups {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-            margin-bottom: 2rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
         }
 
         .failure-groups h2 {
@@ -246,8 +504,8 @@
 
         .failure-group {
             border: 1px solid var(--gray-200);
-            border-radius: 8px;
-            margin-bottom: 1rem;
+            border-radius: 10px;
+            margin-bottom: 0.75rem;
             overflow: hidden;
         }
 
@@ -418,14 +676,11 @@
 
         /* Filters */
         .filters-bar {
-            background: white;
-            border-radius: 12px;
-            padding: 1rem;
-            margin-bottom: 1.5rem;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
             display: flex;
             gap: 1rem;
             flex-wrap: wrap;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         }
 
         .filter-btn {
@@ -448,6 +703,97 @@
             background: var(--primary);
             border-color: var(--primary);
             color: white;
+        }
+
+        .table-section {
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .table-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.85rem;
+        }
+
+        .table-toolbar {
+            display: grid;
+            grid-template-columns: minmax(180px, 1.5fr) repeat(2, minmax(150px, 1fr));
+            gap: 0.7rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .table-search,
+        .table-select {
+            border: 1px solid var(--gray-300);
+            border-radius: 10px;
+            padding: 0.6rem 0.75rem;
+            font-size: 0.9rem;
+            width: 100%;
+            background: #fff;
+        }
+
+        .table-search:focus,
+        .table-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(54, 87, 214, 0.12);
+        }
+
+        .failed-tests-table {
+            margin-bottom: 0;
+        }
+
+        .failed-tests-table thead th {
+            font-size: 0.76rem;
+            text-transform: uppercase;
+            color: #334155;
+            letter-spacing: 0.04em;
+            background: #f4f6ff;
+            border-bottom: 1px solid #dbe2f8;
+            white-space: nowrap;
+        }
+
+        .failed-tests-table tbody tr {
+            cursor: pointer;
+        }
+
+        .failed-tests-table td {
+            vertical-align: middle;
+            font-size: 0.9rem;
+            padding: 0.75rem 0.7rem;
+        }
+
+        .confidence-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 58px;
+            padding: 0.18rem 0.5rem;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            background: #eef2ff;
+            color: #3730a3;
+        }
+
+        .action-btn {
+            border: none;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            padding: 0.4rem 0.75rem;
+            color: #fff;
+            background: var(--primary);
+            font-weight: 600;
+        }
+
+        .empty-table {
+            padding: 1rem;
+            text-align: center;
+            color: var(--gray-500);
         }
 
         /* Loading */
@@ -519,11 +865,51 @@
 
         /* Responsive */
         @media (max-width: 768px) {
+            .main-container {
+                padding: 0.8rem;
+            }
+
+            .upload-screen {
+                padding: 1rem;
+            }
+
+            .dashboard-header h1 {
+                font-size: 1.5rem;
+            }
+
             .stats-grid {
                 grid-template-columns: 1fr;
             }
+
+            .attention-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .summary-metrics {
+                grid-template-columns: 1fr;
+            }
+
             .charts-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .table-toolbar {
+                grid-template-columns: 1fr;
+            }
+
+            .overview-grid {
+                grid-template-columns: 1fr;
+            }
+
+            #failureDetailModal .modal-dialog {
+                width: 100%;
+                max-width: 100%;
+            }
+        }
+
+        @media (max-width: 1100px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
 
@@ -562,17 +948,25 @@
         }
 
         /* Failure Detail Modal */
+        #failureDetailModal .modal-dialog {
+            margin: 0 0 0 auto;
+            width: min(700px, 100%);
+            max-width: min(700px, 100%);
+            height: 100%;
+        }
+
         #failureDetailModal .modal-content {
-            border-radius: 16px;
+            border-radius: 0;
             overflow: hidden;
             border: none;
+            min-height: 100vh;
         }
 
         #failureDetailModal .modal-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
             color: white;
             border: none;
-            padding: 1.5rem 2rem;
+            padding: 1.1rem 1.2rem;
         }
 
         #failureDetailModal .modal-title {
@@ -591,7 +985,7 @@
         }
 
         #failureDetailModal .modal-body {
-            padding: 1.5rem 2rem 2rem;
+            padding: 1rem 1.2rem 1.3rem;
         }
 
         .failure-tabs {
@@ -692,6 +1086,37 @@
             background: var(--gray-50);
             border-radius: 10px;
         }
+
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.7rem;
+            margin-bottom: 1rem;
+        }
+
+        .overview-item {
+            padding: 0.7rem;
+            border-radius: 10px;
+            border: 1px solid var(--gray-200);
+            background: #f9faff;
+            min-height: 64px;
+        }
+
+        .overview-label {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--gray-500);
+            font-weight: 600;
+            margin-bottom: 0.2rem;
+        }
+
+        .overview-value {
+            font-size: 0.88rem;
+            color: var(--gray-900);
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
     </style>
 </head>
 <body>
@@ -699,8 +1124,8 @@
         <!-- Upload Screen -->
         <div id="uploadScreen" class="upload-screen">
             <div class="dashboard-header">
-                <h1><i class="fas fa-chart-line"></i> QA Test Intelligence Dashboard</h1>
-                <p>Upload your test execution report to analyze failures and identify potential bugs</p>
+                <h1><i class="fas fa-brain"></i> QA Intelligence</h1>
+                <p>AI-powered test execution analysis &amp; failure classification</p>
             </div>
 
             <div class="upload-area" id="uploadArea">
@@ -727,13 +1152,18 @@
 
         <!-- Dashboard View -->
         <div id="dashboardView" class="dashboard-view">
-            <a href="#" class="back-btn" id="backBtn">
-                <i class="fas fa-arrow-left"></i> Upload New Report
-            </a>
-
             <div class="dashboard-header">
-                <h1><i class="fas fa-chart-line"></i> Test Analysis Results</h1>
-                <p id="reportName">Report Analysis</p>
+                <div class="header-layout">
+                    <div>
+                        <h1><i class="fas fa-brain"></i> QA Intelligence</h1>
+                        <p>AI-powered test execution analysis &amp; failure classification</p>
+                        <div class="header-meta">
+                            <span class="meta-pill" id="reportNamePill"><i class="fas fa-file"></i> <span id="reportName">Report Analysis</span></span>
+                            <span class="meta-pill" id="reportDatePill"><i class="fas fa-calendar-alt"></i> <span id="reportDate">Date unavailable</span></span>
+                        </div>
+                    </div>
+                    <button type="button" class="header-action-btn" id="backBtn"><i class="fas fa-upload"></i> Upload New Report</button>
+                </div>
             </div>
 
             <!-- Stats Cards -->
@@ -786,11 +1216,12 @@
                     </div>
                 </div>
 
-                <div class="stat-card">
+                <div class="stat-card clickable-card" data-card-filter="bug">
                     <div class="stat-card-header">
                         <div>
                             <div class="stat-label">Potential Bugs</div>
                             <div class="stat-value" id="bugCount" style="color: var(--danger);">0</div>
+                            <div class="stat-note">Click to filter failures</div>
                         </div>
                         <div class="stat-icon" style="background: #fef2f2; color: var(--danger);">
                             <i class="fas fa-bug"></i>
@@ -798,11 +1229,12 @@
                     </div>
                 </div>
 
-                <div class="stat-card">
+                <div class="stat-card clickable-card" data-card-filter="automation">
                     <div class="stat-card-header">
                         <div>
                             <div class="stat-label">Automation Issues</div>
                             <div class="stat-value" id="automationCount" style="color: var(--warning);">0</div>
+                            <div class="stat-note">Click to filter failures</div>
                         </div>
                         <div class="stat-icon" style="background: #fef3c7; color: var(--warning);">
                             <i class="fas fa-robot"></i>
@@ -810,11 +1242,12 @@
                     </div>
                 </div>
 
-                <div class="stat-card">
+                <div class="stat-card clickable-card" data-card-filter="data">
                     <div class="stat-card-header">
                         <div>
                             <div class="stat-label">Data Issues</div>
                             <div class="stat-value" id="dataCount" style="color: var(--info);">0</div>
+                            <div class="stat-note">Click to filter failures</div>
                         </div>
                         <div class="stat-icon" style="background: #dbeafe; color: var(--info);">
                             <i class="fas fa-database"></i>
@@ -822,16 +1255,49 @@
                     </div>
                 </div>
 
-                <div class="stat-card">
+                <div class="stat-card clickable-card" data-card-filter="environment">
                     <div class="stat-card-header">
                         <div>
                             <div class="stat-label">Environment Issues</div>
                             <div class="stat-value" id="envCount" style="color: var(--secondary);">0</div>
+                            <div class="stat-note">Click to filter failures</div>
                         </div>
                         <div class="stat-icon" style="background: #f3e8ff; color: var(--secondary);">
                             <i class="fas fa-server"></i>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="attention-summary">
+                <div class="section-title"><i class="fas fa-triangle-exclamation"></i> Requires Attention</div>
+                <div class="attention-grid">
+                    <div class="attention-item">
+                        <div class="attention-label">Failed Tests</div>
+                        <div class="attention-value" id="attentionFailed">0</div>
+                    </div>
+                    <div class="attention-item">
+                        <div class="attention-label">Automation Issues</div>
+                        <div class="attention-value" id="attentionAutomation">0</div>
+                    </div>
+                    <div class="attention-item">
+                        <div class="attention-label">Unknown / Unclassified</div>
+                        <div class="attention-value" id="attentionUnknown">0</div>
+                    </div>
+                    <div class="attention-item">
+                        <div class="attention-label">Potential Bugs</div>
+                        <div class="attention-value" id="attentionBug">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="executive-summary">
+                <div class="section-title"><i class="fas fa-wand-magic-sparkles"></i> AI Executive Summary</div>
+                <div id="aiExecutiveHero" class="executive-hero">Load a report to generate the executive summary.</div>
+                <div class="summary-metrics">
+                    <div class="summary-metric"><strong>Classification Summary</strong><span id="classificationSummaryText">N/A</span></div>
+                    <div class="summary-metric"><strong>Average Confidence</strong><span id="confidenceSummaryText">N/A</span></div>
+                    <div class="summary-metric"><strong>Top Root Cause Signal</strong><span id="rootCauseSummaryText">N/A</span></div>
                 </div>
             </div>
 
@@ -857,9 +1323,47 @@
                 <button class="filter-btn" data-filter="unknown">⚪ Unknown</button>
             </div>
 
+            <div class="table-section" id="failedTestTableSection">
+                <div class="table-section-header">
+                    <div class="section-title" style="margin-bottom:0;"><i class="fas fa-table-list"></i> Failed Test Analysis</div>
+                    <div class="text-muted" id="failedTableCount">0 failed tests</div>
+                </div>
+                <div class="table-toolbar">
+                    <input type="text" id="failedSearchInput" class="table-search" placeholder="Search by test, scenario, root cause...">
+                    <select id="failedClassificationFilter" class="table-select">
+                        <option value="all">All Classifications</option>
+                        <option value="bug">Potential Bugs</option>
+                        <option value="automation">Automation Issues</option>
+                        <option value="data">Data Issues</option>
+                        <option value="environment">Environment Issues</option>
+                        <option value="unknown">Unknown</option>
+                    </select>
+                    <select id="failedStatusFilter" class="table-select">
+                        <option value="all">All Statuses</option>
+                        <option value="fail" selected>Failed</option>
+                        <option value="unknown">Unknown</option>
+                    </select>
+                </div>
+                <div class="table-responsive">
+                    <table class="table failed-tests-table">
+                        <thead>
+                        <tr>
+                            <th>Test Case / Scenario</th>
+                            <th>Status</th>
+                            <th>Classification</th>
+                            <th>Root Cause</th>
+                            <th>Confidence</th>
+                            <th>Action</th>
+                        </tr>
+                        </thead>
+                        <tbody id="failedTestsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Failure Groups -->
             <div class="failure-groups">
-                <h2>Failure Analysis</h2>
+                <h2>Failure Clusters</h2>
                 <div id="failureGroupsContainer">
                     <!-- Failure groups will be inserted here -->
                 </div>
@@ -878,7 +1382,7 @@
 
     <!-- Failure Detail Modal -->
     <div class="modal fade" id="failureDetailModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <div>
@@ -890,6 +1394,27 @@
                 <div class="modal-body">
                     <ul class="nav nav-tabs failure-tabs" id="failureModalTabs" role="tablist"></ul>
                     <div class="tab-content failure-tab-content" id="failureModalTabContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade ado-preview-modal" id="adoBugPreviewModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title">Create ADO Bug</h5>
+                        <div class="modal-subtitle">Preview Only — Azure DevOps integration coming soon</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="adoBugPreviewModalBody"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-secondary" disabled>
+                        Create Bug <span class="ms-2 small text-white-50">Coming Soon</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -908,11 +1433,15 @@
         const failuresById = new Map();
         let failureIdCounter = 0;
         let failureModalInstance = null;
+        let adoPreviewModalInstance = null;
+        let selectedReportMeta = { name: 'Report Analysis', date: 'Date unavailable' };
 
         document.addEventListener('DOMContentLoaded', function() {
             initUploadHandlers();
             initBackButton();
             initFilters();
+            initStatCardFilters();
+            initFailedTableFilters();
         });
 
         function initUploadHandlers() {
@@ -968,7 +1497,9 @@
         }
 
         function initBackButton() {
-            document.getElementById('backBtn').addEventListener('click', (e) => {
+            const backBtn = document.getElementById('backBtn');
+            if (!backBtn) return;
+            backBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 showUploadScreen();
             });
@@ -986,6 +1517,8 @@
             if (fileInfo) fileInfo.classList.remove('show');
             if (analyzeBtn) analyzeBtn.disabled = true;
             window.selectedFile = null;
+            reportData = null;
+            selectedReportMeta = { name: 'Report Analysis', date: 'Date unavailable' };
         }
 
         async function analyzeReport() {
@@ -1052,7 +1585,43 @@
             }
 
             if (tests.length === 0) throw new Error('No test cases found in JSON. Please check the file format.');
-            return { tests, failures, fileName: (window.selectedFile && window.selectedFile.name) ? window.selectedFile.name : 'Uploaded Report' };
+            const fileName = (window.selectedFile && window.selectedFile.name) ? window.selectedFile.name : 'Uploaded Report';
+            const detectedDate = extractReportTimestamp(jsonData) || (window.selectedFile && window.selectedFile.lastModified ? new Date(window.selectedFile.lastModified).toISOString() : null);
+            return { tests, failures, fileName, reportDate: detectedDate };
+        }
+
+        function extractReportTimestamp(jsonData) {
+            if (!jsonData || typeof jsonData !== 'object') return null;
+            const candidates = [
+                jsonData.generatedAt,
+                jsonData.generated_at,
+                jsonData.timestamp,
+                jsonData.executionTime,
+                jsonData.execution_time,
+                jsonData.reportDate,
+                jsonData.report_date,
+                jsonData.createdAt,
+                jsonData.created_at,
+                jsonData.startTime,
+                jsonData.start_time,
+                jsonData.endTime,
+                jsonData.end_time,
+                jsonData.date
+            ];
+
+            for (const value of candidates) {
+                if (!value) continue;
+                if (value instanceof Date && !isNaN(value.getTime())) return value.toISOString();
+                if (typeof value === 'number') {
+                    const date = new Date(value > 1000000000000 ? value : value * 1000);
+                    if (!isNaN(date.getTime())) return date.toISOString();
+                }
+                if (typeof value === 'string' && value.trim()) {
+                    const date = new Date(value.trim());
+                    if (!isNaN(date.getTime())) return date.toISOString();
+                }
+            }
+            return null;
         }
 
         function parseExtentReport(features, tests, failures) {
@@ -1409,7 +1978,13 @@
         }
 
         function renderDashboard() {
-            document.getElementById('reportName').textContent = reportData.fileName;
+            selectedReportMeta = {
+                name: reportData.fileName || 'Uploaded Report',
+                date: formatReportDate(reportData.reportDate)
+            };
+
+            document.getElementById('reportName').textContent = selectedReportMeta.name;
+            document.getElementById('reportDate').textContent = selectedReportMeta.date;
             document.getElementById('totalTests').textContent = reportData.totalTests;
             document.getElementById('passedTests').textContent = reportData.passedTests;
             document.getElementById('failedTests').textContent = reportData.failedTests;
@@ -1419,15 +1994,123 @@
             document.getElementById('automationCount').textContent = reportData.classifications.automation;
             document.getElementById('dataCount').textContent = reportData.classifications.data;
             document.getElementById('envCount').textContent = reportData.classifications.environment;
+            renderAttentionSummary();
+            renderExecutiveSummary();
             renderCharts();
+            renderFailedTestsTable();
             renderFailureGroups();
+        }
+
+        function formatReportDate(rawDate) {
+            if (!rawDate) return 'Date unavailable';
+            const date = new Date(rawDate);
+            if (isNaN(date.getTime())) return 'Date unavailable';
+            return date.toLocaleString();
+        }
+
+        function renderAttentionSummary() {
+            document.getElementById('attentionFailed').textContent = reportData.failedTests || 0;
+            document.getElementById('attentionAutomation').textContent = reportData.classifications.automation || 0;
+            document.getElementById('attentionUnknown').textContent = reportData.classifications.unknown || 0;
+            document.getElementById('attentionBug').textContent = reportData.classifications.bug || 0;
+        }
+
+        function renderExecutiveSummary() {
+            const total = reportData.totalTests || 0;
+            const failed = reportData.failedTests || 0;
+            const automation = reportData.classifications.automation || 0;
+            const unknown = reportData.classifications.unknown || 0;
+            const bugs = reportData.classifications.bug || 0;
+            const heroText = `${failed} of ${total} tests failed. ${automation} failures are classified as automation issues, ${bugs} as potential bugs, and ${unknown} require deeper investigation.`;
+
+            const confidenceValues = reportData.failures
+                .map(f => Number(f.confidence))
+                .filter(value => !isNaN(value) && value > 0);
+            const averageConfidence = confidenceValues.length
+                ? Math.round(confidenceValues.reduce((sum, value) => sum + value, 0) / confidenceValues.length)
+                : null;
+
+            const summaryText = [
+                `Potential Bugs: ${bugs}`,
+                `Automation: ${automation}`,
+                `Data: ${reportData.classifications.data || 0}`,
+                `Environment: ${reportData.classifications.environment || 0}`,
+                `Unknown: ${unknown}`
+            ].join(' | ');
+
+            const topSignal = getTopRootCauseSignal();
+
+            document.getElementById('aiExecutiveHero').textContent = heroText;
+            document.getElementById('classificationSummaryText').textContent = summaryText;
+            document.getElementById('confidenceSummaryText').textContent = averageConfidence !== null ? `${averageConfidence}%` : 'N/A';
+            document.getElementById('rootCauseSummaryText').textContent = topSignal || 'N/A';
+        }
+
+        function getTopRootCauseSignal() {
+            const reasonMap = new Map();
+            reportData.failures.forEach((failure) => {
+                const reason = firstText(failure?.aiAnalysis?.rootCause, firstText(failure?.reason, null));
+                if (!reason) return;
+                const normalizedReason = reason.length > 120 ? `${reason.slice(0, 117)}...` : reason;
+                reasonMap.set(normalizedReason, (reasonMap.get(normalizedReason) || 0) + 1);
+            });
+            let topReason = null;
+            let topCount = 0;
+            reasonMap.forEach((count, reason) => {
+                if (count > topCount) {
+                    topReason = reason;
+                    topCount = count;
+                }
+            });
+            return topReason;
         }
 
         function renderCharts() {
             if (charts.results) charts.results.destroy();
             if (charts.classification) charts.classification.destroy();
-            charts.results = new Chart(document.getElementById('resultsChart').getContext('2d'), { type: 'doughnut', data: { labels: ['Passed', 'Failed', 'Skipped'], datasets: [{ data: [reportData.passedTests, reportData.failedTests, reportData.skippedTests], backgroundColor: ['rgb(16, 185, 129)', 'rgb(239, 68, 68)', 'rgb(156, 163, 175)'] }] }, options: { responsive: true, plugins: { legend: { position: 'bottom' } } } });
-            charts.classification = new Chart(document.getElementById('classificationChart').getContext('2d'), { type: 'bar', data: { labels: ['Potential Bugs', 'Automation', 'Data Issues', 'Environment', 'Unknown'], datasets: [{ label: 'Count', data: [reportData.classifications.bug, reportData.classifications.automation, reportData.classifications.data, reportData.classifications.environment, reportData.classifications.unknown], backgroundColor: ['rgb(239, 68, 68)', 'rgb(245, 158, 11)', 'rgb(59, 130, 246)', 'rgb(124, 58, 237)', 'rgb(156, 163, 175)'] }] }, options: { responsive: true, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, plugins: { legend: { display: false } } } });
+            charts.results = new Chart(document.getElementById('resultsChart').getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Passed', 'Failed', 'Skipped'],
+                    datasets: [{
+                        data: [reportData.passedTests, reportData.failedTests, reportData.skippedTests],
+                        backgroundColor: ['rgb(16, 185, 129)', 'rgb(239, 68, 68)', 'rgb(156, 163, 175)']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+
+            charts.classification = new Chart(document.getElementById('classificationChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['Potential Bugs', 'Automation', 'Data Issues', 'Environment', 'Unknown'],
+                    datasets: [{
+                        label: 'Count',
+                        data: [
+                            reportData.classifications.bug,
+                            reportData.classifications.automation,
+                            reportData.classifications.data,
+                            reportData.classifications.environment,
+                            reportData.classifications.unknown
+                        ],
+                        backgroundColor: ['rgb(239, 68, 68)', 'rgb(245, 158, 11)', 'rgb(59, 130, 246)', 'rgb(124, 58, 237)', 'rgb(156, 163, 175)'],
+                        borderRadius: 8,
+                        borderSkipped: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    indexAxis: 'y',
+                    scales: {
+                        x: { beginAtZero: true, ticks: { stepSize: 1 } },
+                        y: { grid: { display: false } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
         }
 
         function renderFailureGroups(filter = 'all') {
@@ -1436,6 +2119,122 @@
             const filteredGroups = filter === 'all' ? failureGroups : failureGroups.filter(g => g.classification === filter);
             if (!filteredGroups.length) { container.innerHTML = '<p class="text-muted text-center">No failures found for this filter</p>'; return; }
             filteredGroups.forEach((group, index) => container.appendChild(createFailureGroupElement(group, index)));
+        }
+
+        function initStatCardFilters() {
+            document.querySelectorAll('[data-card-filter]').forEach((card) => {
+                card.addEventListener('click', () => {
+                    const filter = card.dataset.cardFilter || 'all';
+                    applyGlobalFailureFilter(filter);
+                    const section = document.getElementById('failedTestTableSection');
+                    if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+            });
+        }
+
+        function applyGlobalFailureFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach((btn) => {
+                btn.classList.toggle('active', btn.dataset.filter === filter);
+            });
+
+            const classificationFilter = document.getElementById('failedClassificationFilter');
+            if (classificationFilter) classificationFilter.value = filter;
+
+            renderFailureGroups(currentFilter);
+            renderFailedTestsTable();
+        }
+
+        function initFailedTableFilters() {
+            const searchInput = document.getElementById('failedSearchInput');
+            const classificationFilter = document.getElementById('failedClassificationFilter');
+            const statusFilter = document.getElementById('failedStatusFilter');
+            if (searchInput) searchInput.addEventListener('input', () => renderFailedTestsTable());
+            if (classificationFilter) classificationFilter.addEventListener('change', () => {
+                applyFailureGroupFilterFromTable();
+            });
+            if (statusFilter) statusFilter.addEventListener('change', () => renderFailedTestsTable());
+        }
+
+        function applyFailureGroupFilterFromTable() {
+            const classificationFilter = document.getElementById('failedClassificationFilter');
+            const value = classificationFilter ? classificationFilter.value : 'all';
+            if (!value || value === 'all') {
+                applyGlobalFailureFilter('all');
+                return;
+            }
+            applyGlobalFailureFilter(value);
+        }
+
+        function renderFailedTestsTable() {
+            const body = document.getElementById('failedTestsTableBody');
+            const count = document.getElementById('failedTableCount');
+            if (!body || !reportData) return;
+
+            const searchText = (document.getElementById('failedSearchInput')?.value || '').toLowerCase().trim();
+            const selectedClassification = document.getElementById('failedClassificationFilter')?.value || 'all';
+            const selectedStatus = document.getElementById('failedStatusFilter')?.value || 'fail';
+
+            const filteredFailures = reportData.failures.filter((failure) => {
+                const status = (failure.status || '').toLowerCase();
+                if (selectedStatus !== 'all' && status !== selectedStatus) return false;
+                if (selectedClassification !== 'all' && failure.classification !== selectedClassification) return false;
+                if (!searchText) return true;
+
+                const rootCause = firstText(failure?.aiAnalysis?.rootCause, firstText(failure.reason, firstText(failure.error, '')));
+                const haystack = [
+                    failure.name,
+                    failure.feature,
+                    failure.failedStep,
+                    failure.classification,
+                    rootCause
+                ].join(' ').toLowerCase();
+                return haystack.includes(searchText);
+            });
+
+            count.textContent = `${filteredFailures.length} failed test${filteredFailures.length === 1 ? '' : 's'}`;
+            if (!filteredFailures.length) {
+                body.innerHTML = `<tr><td colspan="6" class="empty-table">No failed tests found for the current filters.</td></tr>`;
+                return;
+            }
+
+            body.innerHTML = filteredFailures.map((failure) => {
+                const rootCause = firstText(failure?.aiAnalysis?.rootCause, firstText(failure.reason, firstText(failure.error, 'N/A')));
+                const confidenceRaw = Number(failure.confidence);
+                const confidence = !isNaN(confidenceRaw) && confidenceRaw > 0 ? `${Math.round(confidenceRaw)}%` : 'N/A';
+                return `
+                    <tr data-failure-id="${failure._failureId}">
+                        <td>
+                            <strong>${escapeHtml(failure.name || 'N/A')}</strong>
+                            ${failure.feature ? `<div class="text-muted" style="font-size:0.8rem;">${escapeHtml(failure.feature)}</div>` : ''}
+                        </td>
+                        <td><span class="modal-badge" style="background:#fee2e2;color:#991b1b;">${escapeHtml((failure.status || 'N/A').toUpperCase())}</span></td>
+                        <td><span class="classification-badge ${failure.classification || 'unknown'}">${escapeHtml(classificationTitle(failure.classification))}</span></td>
+                        <td>${escapeHtml(rootCause || 'N/A')}</td>
+                        <td><span class="confidence-pill">${escapeHtml(confidence)}</span></td>
+                        <td><button type="button" class="action-btn" data-failure-id="${failure._failureId}">View</button></td>
+                    </tr>`;
+            }).join('');
+
+            body.querySelectorAll('tr').forEach((row) => {
+                row.addEventListener('click', () => openFailureModal(row.dataset.failureId));
+            });
+            body.querySelectorAll('.action-btn').forEach((button) => {
+                button.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    openFailureModal(button.dataset.failureId);
+                });
+            });
+        }
+
+        function classificationTitle(classification) {
+            return {
+                bug: 'Potential Bug',
+                automation: 'Automation Issue',
+                data: 'Data Issue',
+                environment: 'Environment Issue',
+                unknown: 'Unknown'
+            }[classification] || 'Unknown';
         }
 
         function createFailureGroupElement(group, index) {
@@ -1500,7 +2299,8 @@
         }
 
         function escapeHtml(value) {
-            return value.replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\'':'&#39;','\"':'&quot;'}[ch]));
+            const text = value == null ? '' : String(value);
+            return text.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[ch]));
         }
 
         function classificationMeta(classification) {
@@ -1703,9 +2503,23 @@
                 ${(!aiAnalysis.evidence.length && !aiAnalysis.missingEvidence.length) ? '<p class="text-muted">No evidence details returned by AI.</p>' : ''}`;
         }
 
-        function renderReproduceTab(aiAnalysis) {
-            return `${showListBlock('Steps to Reproduce', aiAnalysis.stepsToReproduce, 'list-ol', true)}
-                ${!aiAnalysis.stepsToReproduce.length ? '<p class="text-muted">No reproduction steps returned by AI.</p>' : ''}`;
+        function renderReproduceTab(test, aiAnalysis) {
+            const steps = Array.isArray(aiAnalysis?.stepsToReproduce) && aiAnalysis.stepsToReproduce.length
+                ? aiAnalysis.stepsToReproduce
+                : (Array.isArray(test?.allSteps) && test.allSteps.length ? test.allSteps : []);
+
+            const stepMarkup = steps.length
+                ? `<ol class="test-list" style="list-style-type: decimal; padding-left: 22px;">${steps.map(step => `<li class="test-list-item">${escapeHtml(String(step))}</li>`).join('')}</ol>`
+                : '<p class="text-muted">Steps to reproduce are not available.</p>';
+
+            return `
+                <div class="d-flex justify-content-between align-items-center gap-2 mb-2 flex-wrap">
+                    <span class="failure-meta-label"><i class="fas fa-list-ol"></i> Steps to Reproduce</span>
+                    <button type="button" class="btn btn-sm ado-create-btn" data-ado-create="true">
+                        <i class="fas fa-bug"></i> Create ADO Bug
+                    </button>
+                </div>
+                ${stepMarkup}`;
         }
 
         function renderFixTab(aiAnalysis) {
@@ -1725,6 +2539,50 @@
             return `<div class="video-link-box"><i class="fas fa-video"></i> <a href="${test.videoUrl}" target="_blank" rel="noopener">${escapeHtml(test.videoUrl)}</a></div>`;
         }
 
+        function extractLocatorInfo(test) {
+            const raw = test && test._raw ? test._raw : {};
+            return firstText(
+                raw.locator || raw.element || raw.selector || raw.xpath || raw.cssSelector || raw.locatorInfo,
+                null
+            );
+        }
+
+        function extractStackTrace(test) {
+            const raw = test && test._raw ? test._raw : {};
+            return firstText(raw.stackTrace || raw.stack_trace || raw.trace, null);
+        }
+
+        function extractEvidenceSummary(aiAnalysis) {
+            if (!aiAnalysis || !Array.isArray(aiAnalysis.evidence) || !aiAnalysis.evidence.length) return null;
+            return aiAnalysis.evidence[0];
+        }
+
+        function renderOverviewTab(test, aiAnalysis) {
+            const fields = [
+                { label: 'Test Name', value: test.name },
+                { label: 'Scenario', value: test.name },
+                { label: 'Status', value: (test.status || '').toUpperCase() },
+                { label: 'Classification', value: classificationTitle(test.classification) },
+                { label: 'Root Cause', value: firstText(aiAnalysis.rootCause, firstText(test.reason, null)) },
+                { label: 'Confidence', value: Number.isFinite(Number(aiAnalysis.confidence)) && Number(aiAnalysis.confidence) > 0 ? `${Math.round(Number(aiAnalysis.confidence))}%` : null },
+                { label: 'Error Message', value: firstText(test.error, null) },
+                { label: 'Locator Information', value: extractLocatorInfo(test) },
+                { label: 'Stack Trace', value: extractStackTrace(test) },
+                { label: 'AI Analysis', value: firstText(aiAnalysis.similarPatterns, null) },
+                { label: 'Evidence', value: extractEvidenceSummary(aiAnalysis) }
+            ].filter(field => field.value && String(field.value).trim());
+
+            if (!fields.length) {
+                return '<p class="text-muted">No additional failure details are available for this test.</p>';
+            }
+
+            return `<div class="overview-grid">${fields.map(field => `
+                <div class="overview-item">
+                    <div class="overview-label">${escapeHtml(field.label)}</div>
+                    <div class="overview-value">${escapeHtml(String(field.value))}</div>
+                </div>`).join('')}</div>`;
+        }
+
         function openFailureModal(failureId) {
             const test = failuresById.get(failureId);
             if (!test) return;
@@ -1734,13 +2592,14 @@
             const titleEl = document.getElementById('failureModalTitle');
             const subtitleEl = document.getElementById('failureModalSubtitle');
             if (titleEl) titleEl.textContent = test.name || 'Failure Details';
-            if (subtitleEl) subtitleEl.textContent = (test.feature ? test.feature + ' • ' : '') + (test.failedStep || '');
+            if (subtitleEl) subtitleEl.textContent = `${test.feature ? test.feature + ' • ' : ''}${(test.status || 'unknown').toUpperCase()} • ${classificationTitle(test.classification)}`;
 
             const tabs = [
+                { id: 'overview', icon: 'fa-circle-info', label: 'Overview', render: () => renderOverviewTab(test, aiAnalysis) },
                 { id: 'screenshot', icon: 'fa-image', label: 'Screenshot Analysis', render: () => renderScreenshotTab(test, aiAnalysis) },
                 { id: 'rootcause', icon: 'fa-bug', label: 'Root Cause', render: () => renderRootCauseTab(test, aiAnalysis) },
                 { id: 'evidence', icon: 'fa-clipboard-list', label: 'Evidence', render: () => renderEvidenceTab(aiAnalysis) },
-                { id: 'reproduce', icon: 'fa-list-ol', label: 'Steps to Reproduce', render: () => renderReproduceTab(aiAnalysis) },
+                { id: 'reproduce', icon: 'fa-list-ol', label: 'Steps to Reproduce', render: () => renderReproduceTab(test, aiAnalysis) },
                 { id: 'fix', icon: 'fa-wrench', label: 'Fix & Actions', render: () => renderFixTab(aiAnalysis) },
                 { id: 'allsteps', icon: 'fa-shoe-prints', label: 'All Test Steps', render: () => renderStepsTab(test) },
                 { id: 'video', icon: 'fa-video', label: 'Video', render: () => renderVideoTab(test) }
@@ -1766,7 +2625,123 @@
             // above; wire up its click handlers now that the elements exist in the DOM.
             attachClassificationFeedbackHandlers(test);
 
+            const adoCreateButton = document.querySelector('[data-ado-create="true"]');
+            if (adoCreateButton) {
+                adoCreateButton.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openAdoBugPreviewModal(test);
+                });
+            }
+
             showFailureModal();
+        }
+
+        function openAdoBugPreviewModal(test) {
+            const bodyEl = document.getElementById('adoBugPreviewModalBody');
+            const modalEl = document.getElementById('adoBugPreviewModal');
+            if (!bodyEl || !modalEl) return;
+
+            bodyEl.innerHTML = renderAdoBugPreviewBody(test);
+            if (window.bootstrap && window.bootstrap.Modal) {
+                if (!adoPreviewModalInstance) {
+                    adoPreviewModalInstance = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+                }
+                adoPreviewModalInstance.show();
+            }
+        }
+
+        function renderAdoBugPreviewBody(test) {
+            const aiAnalysis = test?.aiAnalysis || normalizeAnalysis({});
+            const raw = test?._raw || {};
+            const classificationLabel = firstText(test?.classification ? classificationTitle(test.classification) : aiAnalysis.classification, 'Not available');
+            const rootCause = firstText(aiAnalysis.rootCause, firstText(test?.reason, 'Not available'));
+            const confidence = Number.isFinite(Number(aiAnalysis.confidence)) && Number(aiAnalysis.confidence) > 0
+                ? `${Math.round(Number(aiAnalysis.confidence))}%`
+                : 'Not available';
+            const steps = Array.isArray(aiAnalysis.stepsToReproduce) && aiAnalysis.stepsToReproduce.length
+                ? aiAnalysis.stepsToReproduce
+                : (Array.isArray(test?.allSteps) && test.allSteps.length ? test.allSteps : []);
+            const title = `[${classificationLabel || 'Issue'}] ${firstText(test?.name, firstText(test?.feature, 'Unnamed Test'))}`;
+            const description = [
+                `Test/Scenario:\n${firstText(test?.name, firstText(raw.scenarioName, 'Not available'))}`,
+                `Failure Classification:\n${classificationLabel}`,
+                `Root Cause:\n${rootCause}`,
+                `AI Confidence:\n${confidence}`
+            ].join('\n\n');
+            const expectedResult = firstText(raw.expectedResult, firstText(test?.expectedResult, firstText(aiAnalysis?.expectedResult, 'Not available')));
+            const actualResult = [firstText(test?.error, null), firstText(test?.reason, null), rootCause].filter(Boolean).join('\n\n') || 'Not available';
+            const environment = [
+                firstText(raw.environment, null),
+                firstText(raw.platform, null),
+                firstText(raw.browser, null),
+                firstText(raw.device, null),
+                firstText(raw.market, null),
+                firstText(raw.testSuite, null),
+                firstText(raw.test_suite, null),
+                firstText(test?.feature, null)
+            ].filter(Boolean).join(' • ') || 'Not available';
+            const severity = firstText(aiAnalysis?.severity, 'Not available');
+            const priority = firstText(raw.priority, firstText(test?.priority, firstText(aiAnalysis?.priority, 'Not available')));
+            const evidenceItems = [];
+            if (test?.screenshot) evidenceItems.push(`Attachment: ${resolveScreenshotSrc(test.screenshot)}`);
+            if (test?.videoUrl) evidenceItems.push(`Video: ${test.videoUrl}`);
+            if (Array.isArray(aiAnalysis?.evidence) && aiAnalysis.evidence.length) {
+                evidenceItems.push(...aiAnalysis.evidence.map(item => String(item)));
+            }
+            if (Array.isArray(aiAnalysis?.missingEvidence) && aiAnalysis.missingEvidence.length) {
+                evidenceItems.push(`Missing Evidence: ${aiAnalysis.missingEvidence.join(' | ')}`);
+            }
+            const attachMarkup = evidenceItems.length
+                ? `<ul class="test-list">${evidenceItems.map(item => `<li class="test-list-item">${escapeHtml(String(item))}</li>`).join('')}</ul>`
+                : '<span class="ado-preview-empty">Not available</span>';
+            const screenshotSrc = resolveScreenshotSrc(test?.screenshot);
+            const screenshotMarkup = screenshotSrc
+                ? `<img class="ado-preview-image" src="${screenshotSrc}" alt="Failure screenshot preview" onerror="this.style.display='none';this.nextElementSibling && (this.nextElementSibling.style.display='block');"> <div class="ado-preview-empty" style="display:none;">Screenshot unavailable.</div>`
+                : '<span class="ado-preview-empty">Not available</span>';
+
+            return `
+                <div class="ado-preview-banner"><i class="fas fa-info-circle"></i> Preview Only — Azure DevOps integration coming soon</div>
+                <div class="ado-preview-section">
+                    <h6>Title</h6>
+                    <div class="ado-preview-value">${escapeHtml(title)}</div>
+                </div>
+                <div class="ado-preview-section">
+                    <h6>Description</h6>
+                    <div class="ado-preview-value">${escapeHtml(description).replace(/\n/g, '<br>')}</div>
+                </div>
+                <div class="ado-preview-section">
+                    <h6>Steps to Reproduce</h6>
+                    ${steps.length ? `<ol class="test-list" style="list-style-type: decimal; padding-left: 22px;">${steps.map(step => `<li class="test-list-item">${escapeHtml(String(step))}</li>`).join('')}</ol>` : '<span class="ado-preview-empty">Steps to reproduce are not available.</span>'}
+                </div>
+                <div class="ado-preview-grid">
+                    <div class="ado-preview-field"><label>Expected Result</label><div>${escapeHtml(expectedResult)}</div></div>
+                    <div class="ado-preview-field"><label>Severity</label><div>${escapeHtml(severity)}</div></div>
+                    <div class="ado-preview-field"><label>Priority</label><div>${escapeHtml(priority)}</div></div>
+                    <div class="ado-preview-field"><label>Environment</label><div>${escapeHtml(environment)}</div></div>
+                </div>
+                <div class="ado-preview-section">
+                    <h6>Actual Result</h6>
+                    <div class="ado-preview-value">${escapeHtml(actualResult).replace(/\n/g, '<br>')}</div>
+                </div>
+                <div class="ado-preview-section">
+                    <h6>Attachments / Evidence</h6>
+                    ${screenshotMarkup}
+                    ${attachMarkup}
+                </div>
+                <div class="ado-preview-section">
+                    <h6>Root Cause</h6>
+                    <div class="ado-preview-grid">
+                        <div class="ado-preview-field"><label>Classification</label><div>${escapeHtml(classificationLabel)}</div></div>
+                        <div class="ado-preview-field"><label>Root Cause</label><div>${escapeHtml(rootCause)}</div></div>
+                        <div class="ado-preview-field"><label>Root Cause Type</label><div>${escapeHtml(firstText(aiAnalysis?.rootCauseType, 'Not available'))}</div></div>
+                        <div class="ado-preview-field"><label>Confidence</label><div>${escapeHtml(confidence)}</div></div>
+                    </div>
+                </div>
+                <div class="ado-preview-section">
+                    <h6>Suggested Fix</h6>
+                    <div class="ado-preview-value">${escapeHtml(firstText(aiAnalysis?.suggestedFix, 'Not available'))}</div>
+                </div>`;
         }
 
         function showFailureModal() {
@@ -1805,6 +2780,9 @@
                 btn.classList.add('active');
                 currentFilter = btn.dataset.filter;
                 renderFailureGroups(currentFilter);
+                const tableClassificationFilter = document.getElementById('failedClassificationFilter');
+                if (tableClassificationFilter) tableClassificationFilter.value = currentFilter;
+                renderFailedTestsTable();
             }));
         }
     </script>

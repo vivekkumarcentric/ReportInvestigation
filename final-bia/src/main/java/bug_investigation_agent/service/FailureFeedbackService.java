@@ -5,6 +5,8 @@ import bug_investigation_agent.model.request.InvestigationRequest;
 import bug_investigation_agent.model.response.FailureClassificationResponse;
 import bug_investigation_agent.model.response.InvestigationResponse;
 import bug_investigation_agent.repository.FailureFeedbackRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -62,9 +64,11 @@ public class FailureFeedbackService {
     };
 
     private final FailureFeedbackRepository repository;
+    private final ObjectMapper objectMapper;
 
-    public FailureFeedbackService(FailureFeedbackRepository repository) {
+    public FailureFeedbackService(FailureFeedbackRepository repository, ObjectMapper objectMapper) {
         this.repository = repository;
+        this.objectMapper = objectMapper;
     }
 
     public static boolean isValidClassification(String value) {
@@ -87,6 +91,9 @@ public class FailureFeedbackService {
         }
         try {
             FailureFeedback existing = repository.findByFailureId(failureId).orElse(null);
+            if (existing != null) {
+                log.info("Updating existing failure record: {}", failureId);
+            }
             FailureFeedback feedback = existing != null ? existing : new FailureFeedback();
             feedback.setFailureId(failureId);
 
@@ -111,6 +118,17 @@ public class FailureFeedbackService {
 
             feedback.setAiClassification(response == null ? null : response.getClassification());
             feedback.setRootCause(response == null ? null : response.getRootCause());
+            feedback.setRootCauseType(response == null ? null : response.getRootCauseType());
+            feedback.setSeverity(response == null ? null : response.getSeverity());
+            feedback.setRecommendedAction(response == null ? null : response.getRecommendedAction());
+            feedback.setSuggestedFix(response == null ? null : response.getSuggestedFix());
+            feedback.setSimilarPatterns(response == null ? null : response.getSimilarPatterns());
+            feedback.setScreenshotObservation(response == null ? null : response.getScreenshotObservation());
+            feedback.setEvidenceJson(toJsonArray(response == null ? null : response.getEvidence()));
+            feedback.setMissingEvidenceJson(toJsonArray(response == null ? null : response.getMissingEvidence()));
+            feedback.setPreventionTipsJson(toJsonArray(response == null ? null : response.getPreventionTips()));
+            feedback.setStepsToReproduceJson(toJsonArray(response == null ? null : response.getStepsToReproduce()));
+            feedback.setSource(response == null ? null : response.getSource());
             feedback.setConfidence(response == null ? null : response.getConfidence());
             // Intentionally NOT touching feedback.humanClassification here.
 
@@ -209,6 +227,17 @@ public class FailureFeedbackService {
             copy.setAiClassification(source.getAiClassification());
             copy.setHumanClassification(source.getHumanClassification());
             copy.setRootCause(source.getRootCause());
+            copy.setRootCauseType(source.getRootCauseType());
+            copy.setSeverity(source.getSeverity());
+            copy.setRecommendedAction(source.getRecommendedAction());
+            copy.setSuggestedFix(source.getSuggestedFix());
+            copy.setSimilarPatterns(source.getSimilarPatterns());
+            copy.setScreenshotObservation(source.getScreenshotObservation());
+            copy.setEvidenceJson(source.getEvidenceJson());
+            copy.setMissingEvidenceJson(source.getMissingEvidenceJson());
+            copy.setPreventionTipsJson(source.getPreventionTipsJson());
+            copy.setStepsToReproduceJson(source.getStepsToReproduceJson());
+            copy.setSource(source.getSource());
             copy.setConfidence(source.getConfidence());
             Instant now = Instant.now();
             copy.setCreatedAt(source.getCreatedAt() == null ? now : source.getCreatedAt());
@@ -413,6 +442,39 @@ public class FailureFeedbackService {
 
     private static String nullToEmpty(String value) {
         return value == null ? "" : value;
+    }
+
+    /**
+     * A persisted record is complete when all rich-analysis columns are present (null indicates
+     * legacy non-rich persistence). Empty strings or [] are treated as legitimate AI outputs.
+     */
+    public boolean isAnalysisComplete(FailureFeedback feedback) {
+        if (feedback == null) {
+            return false;
+        }
+        return feedback.getRootCauseType() != null
+                && feedback.getSeverity() != null
+                && feedback.getRecommendedAction() != null
+                && feedback.getSuggestedFix() != null
+                && feedback.getSimilarPatterns() != null
+                && feedback.getScreenshotObservation() != null
+                && feedback.getEvidenceJson() != null
+                && feedback.getMissingEvidenceJson() != null
+                && feedback.getPreventionTipsJson() != null
+                && feedback.getStepsToReproduceJson() != null
+                && feedback.getSource() != null;
+    }
+
+    private String toJsonArray(List<String> values) {
+        if (values == null) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(values);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to serialize list field for failure feedback persistence: {}", e.getMessage());
+            return null;
+        }
     }
 }
 
