@@ -249,6 +249,32 @@ class FailureFeedbackServiceTest {
     }
 
     @Test
+    void recordAiResult_persistsScreenshotHash() {
+        InvestigationRequest request = request();
+        request.setFailureImage("data:image/png;base64,AAAA");
+        InvestigationResponse response = new InvestigationResponse();
+        response.setClassification("AUTOMATION_ISSUE");
+        response.setRootCause("Locator mismatch in checkout screen");
+        response.setRootCauseType("PROBABLE");
+        response.setConfidence(88);
+        response.setSeverity("HIGH");
+        response.setRecommendedAction("Fix locator");
+        response.setSuggestedFix("Use stable resource-id");
+        response.setSimilarPatterns("Timeout while loading checkout widgets");
+        response.setScreenshotObservation("");
+        response.setSource(FailureFeedbackService.SOURCE_AI);
+        response.setEvidence(List.of());
+        response.setMissingEvidence(List.of());
+        response.setPreventionTips(List.of());
+        response.setStepsToReproduce(List.of());
+
+        failureFeedbackService.recordAiResult("f-hash", request, response);
+
+        FailureFeedback saved = failureFeedbackService.getFeedbackByFailureId("f-hash").orElseThrow();
+        assertThat(saved.getScreenshotHash()).isEqualTo(FailureFeedbackService.calculateScreenshotHash(request.getFailureImage()));
+    }
+
+    @Test
     void oldSchemaRecord_isMigratedAndStillReadable() throws Exception {
         File oldDbFile = new File(tempDir, "feedback-old-schema.db");
         String jdbc = "jdbc:sqlite:" + oldDbFile.getAbsolutePath();
@@ -297,6 +323,7 @@ class FailureFeedbackServiceTest {
         assertThat(existing.getAiClassification()).isEqualTo("AUTOMATION_ISSUE");
         assertThat(existing.getRootCause()).isEqualTo("Old persisted cause");
         assertThat(existing.getRootCauseType()).isNull();
+        assertThat(existing.getScreenshotHash()).isNull();
         assertThat(existing.getEvidenceJson()).isNull();
         assertThat(existing.getSuggestedFix()).isNull();
         assertThat(migratedService.isAnalysisComplete(existing)).isFalse();

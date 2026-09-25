@@ -31,6 +31,7 @@ public class FailureFeedback {
     private String suggestedFix;
     private String similarPatterns;
     private String screenshotObservation;
+    private String screenshotHash;
     private String evidenceJson;
     private String missingEvidenceJson;
     private String preventionTipsJson;
@@ -182,6 +183,14 @@ public class FailureFeedback {
 
     public void setScreenshotObservation(String screenshotObservation) {
         this.screenshotObservation = screenshotObservation;
+    }
+
+    public String getScreenshotHash() {
+        return screenshotHash;
+    }
+
+    public void setScreenshotHash(String screenshotHash) {
+        this.screenshotHash = screenshotHash;
     }
 
     public String getEvidenceJson() {
