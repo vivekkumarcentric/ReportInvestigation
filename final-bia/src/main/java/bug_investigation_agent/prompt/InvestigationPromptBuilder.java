@@ -34,9 +34,9 @@ public class InvestigationPromptBuilder {
                                 NOT PROVIDED - root cause type cannot be CONFIRMED without visual evidence.
                 """;
 
-                String historicalSection = (historicalContext == null || historicalContext.isBlank())
-                                ? "NOT PROVIDED"
-                                : historicalContext.trim();
+        String historicalSection = (historicalContext == null || historicalContext.isBlank())
+                ? "NOT PROVIDED"
+                : historicalContext.trim();
 
         return """
                 You are a Senior SDET specializing in Selenium, Appium, Cucumber, TestNG and mobile/web automation failure investigation.
@@ -51,18 +51,28 @@ public class InvestigationPromptBuilder {
                 RULES:
                 - Use ONLY the evidence below. NEVER invent file/class/method names, selectors, endpoints or log types not present in it.
                 - Read ALL steps for context; root cause may be in an earlier passed step, not just the failed one.
-                                - TimeoutException/NoSuchElementException are SYMPTOMS, not root causes. Explain WHY the wait/lookup failed in this test.
-                                - Do not auto-assume timeouts are application slowness. For locator-related failures, analyze locator stability,
-                                    resource-id/content-desc usage, hierarchy changes, wrong screen/state, and whether the expected element is actually visible.
-                                - Correlate stack trace call sites with screenshot state and the failed step. Root cause must reference this correlation.
-                                - If evidence is insufficient, explicitly say "The evidence indicates..." / "The most likely cause is..." and use POSSIBLE.
                 - Examine the screenshot for: error dialogs, toasts, wrong screen/state, missing/blank elements, incorrect data, spinners,
                   network banners, or any visual anomaly. Use it to confirm/refute the hypothesis.
-                - Do not default to AUTOMATION_ISSUE. Simple locator-not-found with nothing else wrong = AUTOMATION_ISSUE. But if an
-                  assertion compares an expected value against a blank/wrong result AFTER an action that succeeded earlier in the SAME
-                  run (e.g. same navigation worked before, fails identically later), and the screenshot shows the app in a wrong/blank
-                  state (not a test-framework crash), that is evidence of APPLICATION_ISSUE (state/navigation regression), not a broken
-                  locator (broken locators fail consistently, not only on a later repeat of the same action).
+                - FIRST determine the ACTUAL application state from the screenshot, then correlate with failed step expectation.
+                - TimeoutException/NoSuchElementException are SYMPTOMS, not root causes. They MUST NOT by themselves justify AUTOMATION_ISSUE.
+                - Before assigning AUTOMATION_ISSUE for a NoSuchElementException/TimeoutException, prove from screenshot + evidence that
+                  the application was actually in the CORRECT expected state and that failure is attributable to automation locator/wait
+                  rather than the application failing to present expected UI.
+                - If the screenshot visually demonstrates that the application is not presenting the UI/business state required by the failed
+                  step, classify as APPLICATION_ISSUE even when the automation exception is NoSuchElementException or TimeoutException.
+                - If screenshot shows app error dialog/toast/banner, wrong screen/navigation state, missing expected business UI,
+                  blank/wrong UI state, or incorrect business data for failed-step expectation, classify APPLICATION_ISSUE.
+                - For locator failures, explicitly compare EXPECTED application state versus ACTUAL screenshot state.
+                - If expected UI/business element is absent from an otherwise valid screen for a step that explicitly expects it,
+                  treat that as APPLICATION_ISSUE unless concrete evidence proves locator definition is wrong.
+                - Do not assume absent element means locator is wrong.
+                - AUTOMATION_ISSUE is appropriate when app state appears correct but automation cannot locate/interact due to wrong/
+                  unstable locator, wrong accessibility id/resource-id, incorrect waits, stale element, or page object/step implementation issue.
+                - If screenshot evidence and exception evidence conflict, use POSSIBLE and explain the conflict instead of defaulting
+                  to AUTOMATION_ISSUE.
+                - Classification must combine: failed step expectation + screenshot + exception + stack trace + previous steps.
+                - Correlate stack trace call sites with screenshot state and the failed step. Root cause must reference this correlation.
+                - If evidence is insufficient, explicitly say "The evidence indicates..." / "The most likely cause is..." and use POSSIBLE.
                 - Use only platform-correct terms: for native mobile (Appium/page objects like "...ui.pepsiConnect...HomePage.java"),
                   never mention CSS selectors/browser console/network HAR; use accessibility id / resource-id / XCUIElementType / page
                   object method instead.

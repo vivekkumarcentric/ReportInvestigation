@@ -178,6 +178,58 @@ class InvestigationServiceTest {
         }
 
     @Test
+    void currentScreenshotOverridesStaleHistoricalNoScreenshotObservation() {
+        InvestigationRequest request = request();
+        request.setFailureImage("data:image/png;base64,AAAA");
+        String failureId = FailureIdGenerator.generate(
+                request.getScenario(), request.getFeature(), request.getFailedStep(), request.getError());
+
+        FailureFeedback historical = new FailureFeedback();
+        historical.setFailureId(failureId);
+        historical.setAiClassification("APPLICATION_ISSUE");
+        historical.setHumanClassification(null);
+        historical.setRootCause("Saved root cause from prior run");
+        historical.setRootCauseType("PROBABLE");
+        historical.setConfidence(81);
+        historical.setSeverity("MEDIUM");
+        historical.setRecommendedAction("Investigate automation step");
+        historical.setSuggestedFix("Stabilize locator wait");
+        historical.setSimilarPatterns("Element locator mismatch");
+        historical.setScreenshotObservation("No screenshot provided - cannot visually confirm root cause");
+        historical.setEvidenceJson("[\"Error details not available\"]");
+        historical.setMissingEvidenceJson("[\"Specific UI state\"]");
+        historical.setPreventionTipsJson("[\"Use stable locators\"]");
+        historical.setStepsToReproduceJson("[\"Login\",\"Navigate\"]");
+        historical.setSource(FailureFeedbackService.SOURCE_AI);
+
+        when(failureFeedbackService.getFeedbackByFailureId(failureId)).thenReturn(Optional.of(historical));
+        when(failureFeedbackService.isAnalysisComplete(historical)).thenReturn(true);
+        when(promptBuilder.buildPrompt(any(InvestigationRequest.class), nullable(String.class))).thenReturn("prompt text");
+        when(failureFeedbackService.getClassification(anyString())).thenReturn(Optional.empty());
+
+        String json = "{"
+                + "\"classification\":\"APPLICATION_ISSUE\","
+                + "\"rootCause\":\"Fresh AI result from current screenshot\","
+                + "\"confidence\":93,"
+                + "\"severity\":\"HIGH\","
+                + "\"rootCauseType\":\"CONFIRMED\""
+                + "}";
+        when(ollamaClient.generateWithMetrics(anyString(), any()))
+                .thenReturn(new OllamaClient.OllamaGenerationResult(json, "qwen2.5:7b", false, 10L, 100, 50));
+
+        InvestigationService.InvestigationOutcome outcome =
+                investigationService.investigateWithMetrics(request, "verify checkout flow");
+
+        assertThat(outcome.response().getFailureId()).isEqualTo(failureId);
+        assertThat(outcome.response().getClassification()).isEqualTo("APPLICATION_ISSUE");
+        assertThat(outcome.response().getSource()).isEqualTo(FailureFeedbackService.SOURCE_AI_ENRICHED);
+        assertThat(outcome.response().getRootCause()).isEqualTo("Fresh AI result from current screenshot");
+        assertThat(outcome.callMetrics()).hasSize(1);
+
+        verify(failureFeedbackService).recordAiResult(anyString(), any(InvestigationRequest.class), any());
+    }
+
+    @Test
         void legacyFailureIdMatch_enrichesAndMigratesAlias() {
         InvestigationRequest request = new InvestigationRequest();
         request.setScenario("verify target flow");

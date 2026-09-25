@@ -76,7 +76,7 @@ public class OllamaClient {
 
         Map<String, Object> options = Map.of(
                 "temperature", 0.1,
-                "num_predict", 2000,
+                "num_predict", 400,
                 "num_ctx", hasImage ? 6144 : 8192
         );
 
@@ -86,7 +86,7 @@ public class OllamaClient {
                         "prompt", prompt,
                         "images", List.of(rawImage),
                         "stream", false,
-                        "format", "json",
+                        "think", false,
                         "options", options)
                 : Map.of(
                         "model", modelToUse,
@@ -97,6 +97,11 @@ public class OllamaClient {
 
         GenerateHttpResult httpResult = doGenerateRaw(request, modelToUse);
         Map<?, ?> raw = httpResult.raw();
+
+        System.out.println("========== OLLAMA RAW RESPONSE ==========");
+        System.out.println(raw);
+        System.out.println("=========================================");
+
         String responseText = raw == null ? null : String.valueOf(raw.get("response"));
         Integer promptEvalCount = raw == null ? null : toInteger(raw.get("prompt_eval_count"));
         Integer evalCount = raw == null ? null : toInteger(raw.get("eval_count"));

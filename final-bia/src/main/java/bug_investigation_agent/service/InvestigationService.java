@@ -82,11 +82,11 @@ public class InvestigationService {
             if (exactMatch.isPresent()) {
                 historicalFound = true;
                 historicalContextRecord = exactMatch.get();
-                if (failureFeedbackService.isAnalysisComplete(exactMatch.get())) {
+                if (shouldReuseHistoricalOutcome(request, exactMatch.get())) {
                     log.info("Complete historical analysis found for failureId={}. Returning persisted result.", failureId);
                     return buildHistoricalOutcomeFromFeedback(failureId, exactMatch.get());
                 }
-                log.info("Historical analysis incomplete for failureId={}. Running enrichment analysis.", failureId);
+                log.info("Historical record for failureId={} is complete but stale for the current screenshot; running enrichment analysis.", failureId);
             }
 
             if (!historicalFound && !failureId.equals(legacyFailureId)) {
@@ -99,7 +99,7 @@ public class InvestigationService {
                     if (aliased.isPresent()) {
                         historicalContextRecord = aliased.get();
                     }
-                    if (aliased.isPresent() && failureFeedbackService.isAnalysisComplete(aliased.get())) {
+                    if (aliased.isPresent() && shouldReuseHistoricalOutcome(request, aliased.get())) {
                         log.info("Complete historical analysis found for failureId={}. Returning persisted result.", failureId);
                         return buildHistoricalOutcomeFromFeedback(failureId, aliased.get());
                     }
@@ -121,6 +121,7 @@ public class InvestigationService {
 
         List<OllamaCallMetrics> callMetrics = new ArrayList<>();
         Exception lastError = null;
+        String lastRawAiResponse = null;
         for (int attempt = 1; attempt <= 2; attempt++) {
             boolean isRetry = attempt > 1;
             OllamaClient.OllamaGenerationResult generation;
@@ -135,6 +136,8 @@ public class InvestigationService {
                         "Ollama AI Service Unavailable: " + e.getMessage() +
                         " Please ensure Ollama is running and required models are loaded.", e);
             }
+
+            lastRawAiResponse = generation.response();
 
             long parseStart = System.nanoTime();
             try {
@@ -168,6 +171,28 @@ public class InvestigationService {
                 // retry once - Ollama occasionally truncates/garbles JSON on long prompts
             }
         }
+
+            String exceptionType = lastError == null ? "UNKNOWN" : lastError.getClass().getName();
+            String exceptionMessage = lastError == null ? "null" : String.valueOf(lastError.getMessage());
+            if (lastRawAiResponse == null || lastRawAiResponse.isBlank()) {
+                log.error("AI response parsing failed after retries. exceptionType={} exceptionMessage={} RAW_AI_RESPONSE=<EMPTY>",
+                    exceptionType, exceptionMessage);
+            } else {
+                String raw = lastRawAiResponse;
+                int length = raw.length();
+                String first200 = raw.substring(0, Math.min(200, length));
+                String last200 = raw.substring(Math.max(0, length - 200));
+                String truncated = raw.substring(0, Math.min(3000, length));
+                log.error(
+                    "AI response parsing failed after retries. exceptionType={} exceptionMessage={} RAW_AI_RESPONSE_LENGTH={} RAW_AI_RESPONSE_FIRST_200={} RAW_AI_RESPONSE_LAST_200={} RAW_AI_RESPONSE_TRUNCATED={}{}",
+                    exceptionType,
+                    exceptionMessage,
+                    length,
+                    first200,
+                    last200,
+                    truncated,
+                    length > 3000 ? "<TRUNCATED>" : "");
+            }
 
         throw new RuntimeException(
                 "Failed to parse AI investigation response. Ollama did not return a valid investigation response.",
@@ -217,6 +242,25 @@ public class InvestigationService {
         response.setStepsToReproduce(parseListJson(feedback.getStepsToReproduceJson()));
 
         return new InvestigationOutcome(response, new ArrayList<>());
+    }
+
+    private boolean shouldReuseHistoricalOutcome(InvestigationRequest request, FailureFeedback feedback) {
+        if (feedback == null || !failureFeedbackService.isAnalysisComplete(feedback)) {
+            return false;
+        }
+
+        String failureImage = request == null ? null : request.getFailureImage();
+        if (failureImage == null || failureImage.isBlank()) {
+            return true;
+        }
+
+        String screenshotObservation = feedback.getScreenshotObservation();
+        if (screenshotObservation == null || screenshotObservation.isBlank()) {
+            return false;
+        }
+
+        String normalized = screenshotObservation.trim();
+        return !"No screenshot provided - cannot visually confirm root cause".equalsIgnoreCase(normalized);
     }
 
     private List<String> parseListJson(String json) {
