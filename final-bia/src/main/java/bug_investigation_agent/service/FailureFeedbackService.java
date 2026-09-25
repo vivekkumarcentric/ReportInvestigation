@@ -11,6 +11,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -125,6 +128,7 @@ public class FailureFeedbackService {
             feedback.setSuggestedFix(response == null ? null : response.getSuggestedFix());
             feedback.setSimilarPatterns(response == null ? null : response.getSimilarPatterns());
             feedback.setScreenshotObservation(response == null ? null : response.getScreenshotObservation());
+            feedback.setScreenshotHash(calculateScreenshotHash(request == null ? null : request.getFailureImage()));
             feedback.setEvidenceJson(toJsonArray(response == null ? null : response.getEvidence()));
             feedback.setMissingEvidenceJson(toJsonArray(response == null ? null : response.getMissingEvidence()));
             feedback.setPreventionTipsJson(toJsonArray(response == null ? null : response.getPreventionTips()));
@@ -234,6 +238,7 @@ public class FailureFeedbackService {
             copy.setSuggestedFix(source.getSuggestedFix());
             copy.setSimilarPatterns(source.getSimilarPatterns());
             copy.setScreenshotObservation(source.getScreenshotObservation());
+            copy.setScreenshotHash(source.getScreenshotHash());
             copy.setEvidenceJson(source.getEvidenceJson());
             copy.setMissingEvidenceJson(source.getMissingEvidenceJson());
             copy.setPreventionTipsJson(source.getPreventionTipsJson());
@@ -496,6 +501,23 @@ public class FailureFeedbackService {
         } catch (JsonProcessingException e) {
             log.warn("Failed to serialize list field for failure feedback persistence: {}", e.getMessage());
             return null;
+        }
+    }
+
+    public static String calculateScreenshotHash(String failureImage) {
+        if (failureImage == null || failureImage.isBlank()) {
+            return null;
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(failureImage.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
         }
     }
 }

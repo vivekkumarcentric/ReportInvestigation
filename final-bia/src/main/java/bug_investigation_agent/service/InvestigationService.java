@@ -254,13 +254,13 @@ public class InvestigationService {
             return true;
         }
 
-        String screenshotObservation = feedback.getScreenshotObservation();
-        if (screenshotObservation == null || screenshotObservation.isBlank()) {
+        String historicalScreenshotHash = feedback.getScreenshotHash();
+        if (historicalScreenshotHash == null || historicalScreenshotHash.isBlank()) {
             return false;
         }
 
-        String normalized = screenshotObservation.trim();
-        return !"No screenshot provided - cannot visually confirm root cause".equalsIgnoreCase(normalized);
+        String currentScreenshotHash = FailureFeedbackService.calculateScreenshotHash(failureImage);
+        return currentScreenshotHash != null && currentScreenshotHash.equalsIgnoreCase(historicalScreenshotHash);
     }
 
     private List<String> parseListJson(String json) {

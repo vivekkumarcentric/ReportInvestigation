@@ -54,6 +54,7 @@ public class FailureFeedbackRepository {
                 suggested_fix TEXT,
                 similar_patterns TEXT,
                 screenshot_observation TEXT,
+                screenshot_hash TEXT,
                 evidence_json TEXT,
                 missing_evidence_json TEXT,
                 prevention_tips_json TEXT,
@@ -74,6 +75,7 @@ public class FailureFeedbackRepository {
         MIGRATION_COLUMNS.put("suggested_fix", "TEXT");
         MIGRATION_COLUMNS.put("similar_patterns", "TEXT");
         MIGRATION_COLUMNS.put("screenshot_observation", "TEXT");
+        MIGRATION_COLUMNS.put("screenshot_hash", "TEXT");
         MIGRATION_COLUMNS.put("evidence_json", "TEXT");
         MIGRATION_COLUMNS.put("missing_evidence_json", "TEXT");
         MIGRATION_COLUMNS.put("prevention_tips_json", "TEXT");
@@ -202,10 +204,10 @@ public class FailureFeedbackRepository {
                     normalized_error, exception_type, locator, stack_trace_pattern,
                     ai_classification, human_classification, root_cause, root_cause_type,
                     severity, recommended_action, suggested_fix, similar_patterns,
-                    screenshot_observation, evidence_json, missing_evidence_json,
+                    screenshot_observation, screenshot_hash, evidence_json, missing_evidence_json,
                     prevention_tips_json, steps_to_reproduce_json, source,
                     confidence, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(failure_id) DO UPDATE SET
                     scenario_name = excluded.scenario_name,
                     feature_name = excluded.feature_name,
@@ -224,6 +226,7 @@ public class FailureFeedbackRepository {
                     suggested_fix = excluded.suggested_fix,
                     similar_patterns = excluded.similar_patterns,
                     screenshot_observation = excluded.screenshot_observation,
+                    screenshot_hash = excluded.screenshot_hash,
                     evidence_json = excluded.evidence_json,
                     missing_evidence_json = excluded.missing_evidence_json,
                     prevention_tips_json = excluded.prevention_tips_json,
@@ -252,18 +255,19 @@ public class FailureFeedbackRepository {
             statement.setString(16, feedback.getSuggestedFix());
             statement.setString(17, feedback.getSimilarPatterns());
             statement.setString(18, feedback.getScreenshotObservation());
-            statement.setString(19, feedback.getEvidenceJson());
-            statement.setString(20, feedback.getMissingEvidenceJson());
-            statement.setString(21, feedback.getPreventionTipsJson());
-            statement.setString(22, feedback.getStepsToReproduceJson());
-            statement.setString(23, feedback.getSource());
+            statement.setString(19, feedback.getScreenshotHash());
+            statement.setString(20, feedback.getEvidenceJson());
+            statement.setString(21, feedback.getMissingEvidenceJson());
+            statement.setString(22, feedback.getPreventionTipsJson());
+            statement.setString(23, feedback.getStepsToReproduceJson());
+            statement.setString(24, feedback.getSource());
             if (feedback.getConfidence() != null) {
-                statement.setInt(24, feedback.getConfidence());
+                statement.setInt(25, feedback.getConfidence());
             } else {
-                statement.setNull(24, java.sql.Types.INTEGER);
+                statement.setNull(25, java.sql.Types.INTEGER);
             }
-            statement.setString(25, toText(feedback.getCreatedAt()));
-            statement.setString(26, toText(feedback.getUpdatedAt()));
+            statement.setString(26, toText(feedback.getCreatedAt()));
+            statement.setString(27, toText(feedback.getUpdatedAt()));
             statement.executeUpdate();
         } catch (SQLException e) {
             log.error("Failed to save failure feedback for failureId={}: {}",
@@ -300,6 +304,7 @@ public class FailureFeedbackRepository {
         feedback.setSuggestedFix(rs.getString("suggested_fix"));
         feedback.setSimilarPatterns(rs.getString("similar_patterns"));
         feedback.setScreenshotObservation(rs.getString("screenshot_observation"));
+        feedback.setScreenshotHash(rs.getString("screenshot_hash"));
         feedback.setEvidenceJson(rs.getString("evidence_json"));
         feedback.setMissingEvidenceJson(rs.getString("missing_evidence_json"));
         feedback.setPreventionTipsJson(rs.getString("prevention_tips_json"));
