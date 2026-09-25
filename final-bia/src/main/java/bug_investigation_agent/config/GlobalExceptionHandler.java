@@ -28,7 +28,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleRuntimeException(RuntimeException ex, WebRequest request) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("error", "Investigation Failed");
-        body.put("message", ex.getMessage());
+        String message = ex.getMessage();
+        Throwable cause = ex.getCause();
+        if (cause != null) {
+            message = message + " Cause: " + cause.getClass().getName() + " - " + String.valueOf(cause.getMessage());
+        }
+        body.put("message", message);
         body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
         body.put("timestamp", System.currentTimeMillis());
 
