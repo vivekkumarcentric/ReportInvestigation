@@ -34,15 +34,18 @@ public class OllamaClient {
     private final String baseUrl;
     private final String model;
     private final String visionModel;
+    private final int visionNumPredict;
 
     public OllamaClient(
             @Value("${ollama.base-url:http://localhost:11434}") String baseUrl,
             @Value("${ollama.model:qwen2.5:7b}") String model,
-            @Value("${ollama.vision-model:llava:7b}") String visionModel) {
+            @Value("${ollama.vision-model:llava:7b}") String visionModel,
+            @Value("${ollama.vision-num-predict:1000}") int visionNumPredict) {
         this.restClient = RestClient.builder().baseUrl(baseUrl).build();
         this.baseUrl = baseUrl;
         this.model = model;
         this.visionModel = visionModel;
+        this.visionNumPredict = visionNumPredict;
     }
 
     public String generate(String prompt) {
@@ -76,7 +79,7 @@ public class OllamaClient {
 
         Map<String, Object> options = Map.of(
                 "temperature", 0.1,
-                "num_predict", 400,
+            "num_predict", hasImage ? visionNumPredict : 400,
                 "num_ctx", hasImage ? 6144 : 8192
         );
 

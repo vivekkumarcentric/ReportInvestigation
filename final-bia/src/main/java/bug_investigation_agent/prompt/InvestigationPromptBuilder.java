@@ -76,12 +76,15 @@ public class InvestigationPromptBuilder {
                 - Use only platform-correct terms: for native mobile (Appium/page objects like "...ui.pepsiConnect...HomePage.java"),
                   never mention CSS selectors/browser console/network HAR; use accessibility id / resource-id / XCUIElementType / page
                   object method instead.
+                                - Keep every field concise and high-signal. Avoid verbose prose in array fields.
+                                - Output "screenshotObservation" early in the JSON so it is less likely to be truncated.
 
                 OUTPUT FIELDS (JSON only, no markdown, no extra text):
                 {
                   "classification": "AUTOMATION_ISSUE|APPLICATION_ISSUE|API_ISSUE|DATA_ISSUE|ENVIRONMENT_ISSUE|NETWORK_ISSUE|UNKNOWN",
                                     "rootCauseType": "CONFIRMED|PROBABLE|POSSIBLE",
                                     "rootCause": "1-3 concise sentences: specific technical cause + concrete evidence correlation (error/stack/screenshot/step)",
+                                    "screenshotObservation": "exact screen/state/errors/elements seen in the screenshot, or 'No screenshot provided - cannot visually confirm root cause' if none",
                   "confidence": 0,
                   "evidence": ["specific evidence strings: quoted error, step refs, screenshot content, stack trace lines"],
                   "missingEvidence": ["info that would help, appropriate to the platform actually used (mobile: device logs, Appium session log, backend logs; web: browser console, network HAR)"],
@@ -90,8 +93,7 @@ public class InvestigationPromptBuilder {
                   "suggestedFix": "concrete code-level fix grounded ONLY in the evidence, platform-appropriate (Appium vs Selenium); if APPLICATION_ISSUE describe precisely what app behavior is wrong and should be logged as a defect",
                   "stepsToReproduce": ["ordered concrete manual steps with real data values, starting from app launch/login"],
                   "preventionTips": ["2-4 specific actionable automation best practices for this exact failure type"],
-                  "similarPatterns": "1-2 look-alike failure patterns and how they differ from this one",
-                  "screenshotObservation": "exact screen/state/errors/elements seen in the screenshot, or 'No screenshot provided - cannot visually confirm root cause' if none"
+                                    "similarPatterns": "1-2 look-alike failure patterns and how they differ from this one"
                 }
                                 Confidence guide: CONFIRMED+screenshot 85-95, CONFIRMED from trace only 75-85, PROBABLE 60-75, POSSIBLE 35-60.
                 Never leave recommendedAction/suggestedFix empty or generic.
