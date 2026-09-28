@@ -22,6 +22,9 @@ import java.util.Optional;
 @Service
 public class InvestigationService {
     private static final Logger log = LoggerFactory.getLogger(InvestigationService.class);
+    private static final String SCREENSHOT_FALLBACK_OBSERVATION =
+            "A screenshot was attached but the AI vision model did not clearly describe it. "
+                    + "Please review the screenshot manually alongside this analysis.";
 
     private final OllamaClient ollamaClient;
     private final InvestigationPromptBuilder promptBuilder;
@@ -254,6 +257,11 @@ public class InvestigationService {
             return true;
         }
 
+        String historicalScreenshotObservation = feedback.getScreenshotObservation();
+        if (historicalScreenshotObservation == null || historicalScreenshotObservation.isBlank()) {
+            return false;
+        }
+
         String historicalScreenshotHash = feedback.getScreenshotHash();
         if (historicalScreenshotHash == null || historicalScreenshotHash.isBlank()) {
             return false;
@@ -408,11 +416,14 @@ public class InvestigationService {
             return;
         }
         String observation = response.getScreenshotObservation();
-        if (observation != null && observation.toLowerCase().contains("no screenshot")
-                || (observation != null && observation.toLowerCase().contains("not provided"))) {
-            response.setScreenshotObservation(
-                    "A screenshot was attached but the AI vision model did not clearly describe it. "
-                    + "Please review the screenshot manually alongside this analysis.");
+        if (observation == null || observation.isBlank()) {
+            response.setScreenshotObservation(SCREENSHOT_FALLBACK_OBSERVATION);
+            return;
+        }
+
+        String normalized = observation.toLowerCase();
+        if (normalized.contains("no screenshot") || normalized.contains("not provided")) {
+            response.setScreenshotObservation(SCREENSHOT_FALLBACK_OBSERVATION);
         }
     }
 
