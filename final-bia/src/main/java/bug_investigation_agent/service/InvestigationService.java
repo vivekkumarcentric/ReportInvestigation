@@ -147,6 +147,7 @@ public class InvestigationService {
                 String json = normalizeResponse(repairJson(extractJson(generation.response())));
                 InvestigationResponse parsed = objectMapper.readValue(json, InvestigationResponse.class);
                 correctHallucinatedScreenshotText(parsed, image);
+                enforceClassificationConsistency(parsed, request);
                 log.info("Updating existing failure record: {}", failureId);
                 applyHumanFeedback(failureId, request, parsed, historicalFound);
                 log.info("Updated historical analysis for failureId={} with enriched AI result.", failureId);
@@ -425,6 +426,172 @@ public class InvestigationService {
         if (normalized.contains("no screenshot") || normalized.contains("not provided")) {
             response.setScreenshotObservation(SCREENSHOT_FALLBACK_OBSERVATION);
         }
+    }
+
+    /**
+     * Applies deterministic guardrails for frequent LLM inconsistencies where classification and
+     * remediation text disagree (for example APPLICATION_ISSUE but suggested fix is clearly an
+     * automation locator/page-object update).
+     */
+    private void enforceClassificationConsistency(InvestigationResponse response, InvestigationRequest request) {
+        if (response == null) {
+            return;
+        }
+
+        String classification = safeUpper(response.getClassification());
+        if (("APPLICATION_ISSUE".equals(classification) || "UNKNOWN".equals(classification))
+                && looksLikeEnvironmentOutage(response, request)) {
+            response.setClassification("ENVIRONMENT_ISSUE");
+            return;
+        }
+
+        if (("APPLICATION_ISSUE".equals(classification) || "AUTOMATION_ISSUE".equals(classification))
+                && looksLikeBusinessContentDataIssue(response, request)) {
+            response.setClassification("DATA_ISSUE");
+            return;
+        }
+
+        if ("APPLICATION_ISSUE".equals(classification) && looksLikeTestExpectationTypo(response, request)) {
+            response.setClassification("AUTOMATION_ISSUE");
+            return;
+        }
+
+        if ("APPLICATION_ISSUE".equals(classification) && looksLikeAutomationOwnership(response, request)) {
+            response.setClassification("AUTOMATION_ISSUE");
+
+            // Without concrete exception/stack details, keep confidence conservative.
+            boolean hasTraceEvidence = hasExceptionEvidence(request);
+            if (!hasTraceEvidence) {
+                response.setRootCauseType("PROBABLE");
+                response.setConfidence(Math.min(response.getConfidence(), 85));
+            }
+        }
+    }
+
+    private boolean looksLikeAutomationOwnership(InvestigationResponse response, InvestigationRequest request) {
+        String merged = (
+                nullToEmpty(response.getRootCause()) + "\n" +
+                nullToEmpty(response.getRecommendedAction()) + "\n" +
+                nullToEmpty(response.getSuggestedFix()) + "\n" +
+                nullToEmpty(response.getScreenshotObservation()) + "\n" +
+                nullToEmpty(request == null ? null : request.getFailedStep())
+        ).toLowerCase();
+
+        boolean hasAutomationSignal = containsAny(merged,
+                "locator", "page object", "resource-id", "accessibility id", "selector",
+                "stale element", "no such element", "timeout", "wait", "test automation", "deprecated locator", "legacy locator");
+
+        boolean hasHealthyAppSignal = containsAny(merged,
+                "visible", "actionable", "enabled", "no error dialog", "no loading spinner", "app state is correct");
+
+        boolean hasStrongAppBugSignal = containsAny(merged,
+                "api failure", "backend error", "server error", "http 500", "null pointer", "crash", "wrong business logic");
+
+        return hasAutomationSignal && hasHealthyAppSignal && !hasStrongAppBugSignal;
+    }
+
+        private boolean looksLikeEnvironmentOutage(InvestigationResponse response, InvestigationRequest request) {
+        String merged = (
+            nullToEmpty(response.getRootCause()) + "\n" +
+            nullToEmpty(response.getRecommendedAction()) + "\n" +
+            nullToEmpty(response.getSuggestedFix()) + "\n" +
+            nullToEmpty(response.getScreenshotObservation()) + "\n" +
+            nullToEmpty(request == null ? null : request.getError()) + "\n" +
+            nullToEmpty(request == null ? null : request.getConsoleLogs())
+        ).toLowerCase();
+
+        boolean hasConnectivitySignal = containsAny(merged,
+            "err_connection_refused", "refused to connect", "this site can't be reached",
+            "connection refused", "connection timed out", "unable to connect", "service unavailable",
+            "host unreachable", "dns", "econnrefused", "127.0.0.1", "localhost");
+
+        boolean hasInfraOwnershipSignal = containsAny(merged,
+            "service is not running", "server is down", "start service", "verify service", "port",
+            "check service status", "backend logs", "environment", "infrastructure", "network");
+
+        boolean hasAppUiSignal = containsAny(merged,
+            "app ui", "button visible", "screen loaded", "page rendered", "business flow completed");
+
+        return hasConnectivitySignal && hasInfraOwnershipSignal && !hasAppUiSignal;
+        }
+
+        private boolean looksLikeTestExpectationTypo(InvestigationResponse response, InvestigationRequest request) {
+        String merged = (
+            nullToEmpty(response.getRootCause()) + "\n" +
+            nullToEmpty(response.getRecommendedAction()) + "\n" +
+            nullToEmpty(response.getSuggestedFix()) + "\n" +
+            nullToEmpty(response.getScreenshotObservation()) + "\n" +
+            nullToEmpty(request == null ? null : request.getFailedStep())
+        ).toLowerCase();
+
+        boolean hasExpectationSignal = containsAny(merged,
+            "test step", "gherkin", "assertion", "expected", "update the test",
+            "change the assertion", "step expects", "spelling mismatch", "typo", "misspelled");
+
+        boolean hasHealthyUiSignal = containsAny(merged,
+            "ui is correct", "visible", "properly rendered", "no error dialogs", "no loading spinners");
+
+        boolean hasAppDataDefectSignal = containsAny(merged,
+            "app displays wrong", "ui text is wrong", "backend returned wrong", "content management", "cms", "copy defect");
+
+        return hasExpectationSignal && hasHealthyUiSignal && !hasAppDataDefectSignal;
+        }
+
+        private boolean looksLikeBusinessContentDataIssue(InvestigationResponse response, InvestigationRequest request) {
+        String merged = (
+            nullToEmpty(response.getRootCause()) + "\n" +
+            nullToEmpty(response.getRecommendedAction()) + "\n" +
+            nullToEmpty(response.getSuggestedFix()) + "\n" +
+            nullToEmpty(response.getScreenshotObservation()) + "\n" +
+            nullToEmpty(request == null ? null : request.getFailedStep()) + "\n" +
+            nullToEmpty(request == null ? null : request.getError())
+        ).toLowerCase();
+
+        boolean hasContentDefectSignal = containsAny(merged,
+            "spelling", "misspell", "typo", "wrong label", "wrong text", "incorrect content",
+            "content mismatch", "copy mismatch", "translation", "localization", "business data");
+
+        boolean attributesIssueToAppData = containsAny(merged,
+            "app displays", "ui shows", "backend response", "api returned", "cms", "content service", "master data");
+
+        boolean attributesIssueToTestOnly = containsAny(merged,
+            "update test step", "change assertion", "test expects", "fix gherkin", "test script typo");
+
+        return hasContentDefectSignal && attributesIssueToAppData && !attributesIssueToTestOnly;
+        }
+
+    private boolean hasExceptionEvidence(InvestigationRequest request) {
+        if (request == null) {
+            return false;
+        }
+        String error = nullToEmpty(request.getError()).trim();
+        String stack = nullToEmpty(request.getStackTrace()).trim();
+        if (error.isEmpty() && stack.isEmpty()) {
+            return false;
+        }
+        String combined = (error + "\n" + stack).toLowerCase();
+        return containsAny(combined,
+                "exception", "error", "at ", "no such element", "stale element", "timeout", "assertion");
+    }
+
+    private boolean containsAny(String value, String... terms) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        for (String term : terms) {
+            if (value.contains(term)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String safeUpper(String value) {
+        return value == null ? "" : value.trim().toUpperCase();
+    }
+
+    private String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     private String extractJson(String response) {

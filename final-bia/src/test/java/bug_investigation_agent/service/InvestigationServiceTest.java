@@ -710,6 +710,130 @@ class InvestigationServiceTest {
                 assertThat(normalOutcome.response().getRootCause()).isEqualTo("Fresh root cause from AI");
                 assertThat(normalOutcome.callMetrics()).isEmpty();
             }
+
+            @Test
+            void inconsistentApplicationClassification_isCorrectedToAutomationIssue() {
+                InvestigationRequest request = request();
+                request.setError("");
+                request.setStackTrace("");
+
+                when(failureFeedbackService.getFeedbackByFailureId(anyString())).thenReturn(Optional.empty());
+                when(promptBuilder.buildPrompt(any(InvestigationRequest.class), nullable(String.class))).thenReturn("prompt text");
+                when(failureFeedbackService.getClassification(anyString())).thenReturn(Optional.empty());
+
+                String inconsistentJson = "{"
+                        + "\"classification\":\"APPLICATION_ISSUE\"," 
+                        + "\"rootCause\":\"Legacy locator cannot find element though button is visible and actionable\"," 
+                        + "\"confidence\":95," 
+                        + "\"severity\":\"MEDIUM\"," 
+                        + "\"rootCauseType\":\"CONFIRMED\"," 
+                        + "\"recommendedAction\":\"Update legacy locator in page object\"," 
+                        + "\"suggestedFix\":\"Replace deprecated resource-id locator\"," 
+                        + "\"screenshotObservation\":\"Place order button visible, no error dialog, no loading spinner\""
+                        + "}";
+
+                when(ollamaClient.generateWithMetrics(anyString(), any()))
+                        .thenReturn(new OllamaClient.OllamaGenerationResult(inconsistentJson, "qwen2.5:7b", true, 10L, 100, 50));
+
+                InvestigationService.InvestigationOutcome outcome =
+                        investigationService.investigateWithMetrics(request, "verify checkout flow");
+
+                assertThat(outcome.response().getClassification()).isEqualTo("AUTOMATION_ISSUE");
+                assertThat(outcome.response().getRootCauseType()).isEqualTo("PROBABLE");
+                assertThat(outcome.response().getConfidence()).isLessThanOrEqualTo(85);
+            }
+
+            @Test
+            void testExpectationTypo_isClassifiedAsAutomationIssue() {
+                InvestigationRequest request = request();
+                request.setFailedStep("Then the heading should contain \"Everyday geer\"");
+                request.setError("");
+                request.setStackTrace("");
+
+                when(failureFeedbackService.getFeedbackByFailureId(anyString())).thenReturn(Optional.empty());
+                when(promptBuilder.buildPrompt(any(InvestigationRequest.class), nullable(String.class))).thenReturn("prompt text");
+                when(failureFeedbackService.getClassification(anyString())).thenReturn(Optional.empty());
+
+                String json = "{"
+                        + "\"classification\":\"APPLICATION_ISSUE\","
+                        + "\"rootCause\":\"Step expects Everyday geer but UI shows Everyday gear\","
+                        + "\"confidence\":88,"
+                        + "\"severity\":\"LOW\","
+                        + "\"rootCauseType\":\"CONFIRMED\","
+                        + "\"recommendedAction\":\"Update test step expected text\","
+                        + "\"suggestedFix\":\"Fix gherkin assertion spelling typo\","
+                        + "\"screenshotObservation\":\"Heading is properly rendered and visible; no error dialogs or loading spinners\""
+                        + "}";
+
+                when(ollamaClient.generateWithMetrics(anyString(), any()))
+                        .thenReturn(new OllamaClient.OllamaGenerationResult(json, "qwen2.5:7b", true, 10L, 100, 50));
+
+                InvestigationService.InvestigationOutcome outcome =
+                        investigationService.investigateWithMetrics(request, "verify heading");
+
+                assertThat(outcome.response().getClassification()).isEqualTo("AUTOMATION_ISSUE");
+            }
+
+            @Test
+            void wrongAppCopy_isClassifiedAsDataIssue() {
+                InvestigationRequest request = request();
+                request.setFailedStep("Then the heading should contain \"Everyday gear\"");
+                request.setError("");
+                request.setStackTrace("");
+
+                when(failureFeedbackService.getFeedbackByFailureId(anyString())).thenReturn(Optional.empty());
+                when(promptBuilder.buildPrompt(any(InvestigationRequest.class), nullable(String.class))).thenReturn("prompt text");
+                when(failureFeedbackService.getClassification(anyString())).thenReturn(Optional.empty());
+
+                String json = "{"
+                        + "\"classification\":\"APPLICATION_ISSUE\","
+                        + "\"rootCause\":\"App displays wrong label: Everyday geer, indicating incorrect business data/copy\","
+                        + "\"confidence\":90,"
+                        + "\"severity\":\"LOW\","
+                        + "\"rootCauseType\":\"CONFIRMED\","
+                        + "\"recommendedAction\":\"Fix CMS/content service value for storefront heading\","
+                        + "\"suggestedFix\":\"Correct master data/copy from geer to gear in backend content\","
+                        + "\"screenshotObservation\":\"UI shows misspelled heading geer\""
+                        + "}";
+
+                when(ollamaClient.generateWithMetrics(anyString(), any()))
+                        .thenReturn(new OllamaClient.OllamaGenerationResult(json, "qwen2.5:7b", true, 10L, 100, 50));
+
+                InvestigationService.InvestigationOutcome outcome =
+                        investigationService.investigateWithMetrics(request, "verify heading");
+
+                assertThat(outcome.response().getClassification()).isEqualTo("DATA_ISSUE");
+            }
+
+            @Test
+            void connectivityOutage_isClassifiedAsEnvironmentIssue() {
+                InvestigationRequest request = request();
+                request.setError("ERR_CONNECTION_REFUSED: 127.0.0.1 refused to connect");
+                request.setStackTrace("");
+
+                when(failureFeedbackService.getFeedbackByFailureId(anyString())).thenReturn(Optional.empty());
+                when(promptBuilder.buildPrompt(any(InvestigationRequest.class), nullable(String.class))).thenReturn("prompt text");
+                when(failureFeedbackService.getClassification(anyString())).thenReturn(Optional.empty());
+
+                String json = "{"
+                        + "\"classification\":\"APPLICATION_ISSUE\","
+                        + "\"rootCause\":\"This site can't be reached and localhost refused to connect\","
+                        + "\"confidence\":95,"
+                        + "\"severity\":\"CRITICAL\","
+                        + "\"rootCauseType\":\"CONFIRMED\","
+                        + "\"recommendedAction\":\"Verify local service is running on port 8081 and check backend logs\","
+                        + "\"suggestedFix\":\"Start dependent storefront service before tests\","
+                        + "\"screenshotObservation\":\"Browser shows ERR_CONNECTION_REFUSED and no app UI is visible\""
+                        + "}";
+
+                when(ollamaClient.generateWithMetrics(anyString(), any()))
+                        .thenReturn(new OllamaClient.OllamaGenerationResult(json, "qwen2.5:7b", true, 10L, 100, 50));
+
+                InvestigationService.InvestigationOutcome outcome =
+                        investigationService.investigateWithMetrics(request, "verify storefront launch");
+
+                assertThat(outcome.response().getClassification()).isEqualTo("ENVIRONMENT_ISSUE");
+            }
 }
 
 

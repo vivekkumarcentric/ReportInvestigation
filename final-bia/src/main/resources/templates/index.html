@@ -1269,6 +1269,7 @@
       button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Analyzing...';
 
       try {
+          const normalizedError = normalizeToText(error);
           // Extract all steps context for better analysis
           let allStepsContext = '';
           try {
@@ -1301,7 +1302,7 @@
 
               // If no steps found, create a minimal context
               if (!allStepsContext) {
-                  allStepsContext = `Failed Step: ${step}\nError: ${error.substring(0, 200)}`;
+                  allStepsContext = `Failed Step: ${step}\nError: ${normalizedError.substring(0, 200)}`;
               }
           } catch (e) {
               console.warn('Could not extract all steps:', e);
@@ -1313,13 +1314,13 @@
               testName: testid || scenario,
               scenario: scenario,
               failedStep: step,
-              error: error,
+              error: normalizedError,
               failureImage: image || '',
               videoUrl: video || '',
               reportType: currentReportType,
               allSteps: allStepsContext,
               feature: scenario.split(/[:-]/)[0].trim() || 'Unknown Feature',
-              stackTrace: error.includes('at ') ? error : '',
+              stackTrace: normalizedError.includes('at ') ? normalizedError : '',
               consoleLogs: ''
           };
 
@@ -1364,6 +1365,37 @@
 
   // Make function globally available
   window.analyzeFailure = analyzeFailure;
+
+  function normalizeToText(value) {
+      if (value == null) return '';
+      if (typeof value === 'string') return value;
+      if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+      if (Array.isArray(value)) {
+          return value.map(normalizeToText).filter(Boolean).join('\n');
+      }
+      if (typeof value === 'object') {
+          if (value.message) {
+              const msg = normalizeToText(value.message);
+              if (msg) return msg;
+          }
+          if (value.error) {
+              const err = normalizeToText(value.error);
+              if (err) return err;
+          }
+          try {
+              return Object.entries(value)
+                  .map(([k, v]) => {
+                      const txt = normalizeToText(v);
+                      return txt ? `${k}: ${txt}` : '';
+                  })
+                  .filter(Boolean)
+                  .join('\n') || JSON.stringify(value);
+          } catch (e) {
+              return String(value);
+          }
+      }
+      return String(value);
+  }
 
   // Helper function to close AI Analysis modal
   function closeAIAnalysisModal() {

@@ -68,6 +68,9 @@ public class InvestigationPromptBuilder {
                 - Do not assume absent element means locator is wrong.
                 - AUTOMATION_ISSUE is appropriate when app state appears correct but automation cannot locate/interact due to wrong/
                   unstable locator, wrong accessibility id/resource-id, incorrect waits, stale element, or page object/step implementation issue.
+                                - Text/value mismatch ownership rules:
+                                    * If UI/app/business data shown to user is correct but the test expectation/gherkin/assertion is wrong (e.g. typo in expected text), classify AUTOMATION_ISSUE.
+                                    * If UI/app/business data shown to user is incorrect (wrong/misspelled label/copy/value/translation) and test expectation matches intended behavior, classify DATA_ISSUE.
                 - If screenshot evidence and exception evidence conflict, use POSSIBLE and explain the conflict instead of defaulting
                   to AUTOMATION_ISSUE.
                 - Classification must combine: failed step expectation + screenshot + exception + stack trace + previous steps.

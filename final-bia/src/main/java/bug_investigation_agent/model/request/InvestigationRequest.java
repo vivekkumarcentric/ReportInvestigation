@@ -1,6 +1,8 @@
 package bug_investigation_agent.model.request;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class InvestigationRequest {
     private String testName;
@@ -32,9 +34,9 @@ public class InvestigationRequest {
     public String getFailedStep() { return failedStep; }
     public void setFailedStep(String failedStep) { this.failedStep = failedStep; }
     public String getError() { return error; }
-    public void setError(String error) { this.error = error; }
+    public void setError(Object error) { this.error = normalizeToText(error); }
     public String getStackTrace() { return stackTrace; }
-    public void setStackTrace(String stackTrace) { this.stackTrace = stackTrace; }
+    public void setStackTrace(Object stackTrace) { this.stackTrace = normalizeToText(stackTrace); }
     public String getConsoleLogs() { return consoleLogs; }
     public void setConsoleLogs(String consoleLogs) { this.consoleLogs = consoleLogs; }
     public String getFailureImage() { return failureImage; }
@@ -49,5 +51,48 @@ public class InvestigationRequest {
 
     public boolean isForceReanalysisEnabled() {
         return Boolean.TRUE.equals(forceReanalysis);
+    }
+
+    private String normalizeToText(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof String s) {
+            return s;
+        }
+        if (value instanceof Number || value instanceof Boolean) {
+            return String.valueOf(value);
+        }
+        if (value instanceof List<?> list) {
+            List<String> parts = new ArrayList<>();
+            for (Object item : list) {
+                String text = normalizeToText(item);
+                if (text != null && !text.isBlank()) {
+                    parts.add(text);
+                }
+            }
+            return parts.isEmpty() ? null : String.join("\n", parts);
+        }
+        if (value instanceof Map<?, ?> map) {
+            Object message = map.get("message");
+            String messageText = normalizeToText(message);
+            if (messageText != null && !messageText.isBlank()) {
+                return messageText;
+            }
+            Object errorValue = map.get("error");
+            String errorText = normalizeToText(errorValue);
+            if (errorText != null && !errorText.isBlank()) {
+                return errorText;
+            }
+            List<String> fields = new ArrayList<>();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                String fieldText = normalizeToText(entry.getValue());
+                if (fieldText != null && !fieldText.isBlank()) {
+                    fields.add(String.valueOf(entry.getKey()) + ": " + fieldText);
+                }
+            }
+            return fields.isEmpty() ? String.valueOf(value) : String.join("\n", fields);
+        }
+        return String.valueOf(value);
     }
 }
