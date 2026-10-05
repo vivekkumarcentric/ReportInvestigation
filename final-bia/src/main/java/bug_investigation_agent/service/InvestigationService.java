@@ -83,30 +83,38 @@ public class InvestigationService {
         } else {
             Optional<FailureFeedback> exactMatch = failureFeedbackService.getFeedbackByFailureId(failureId);
             if (exactMatch.isPresent()) {
-                historicalFound = true;
-                historicalContextRecord = exactMatch.get();
                 if (shouldReuseHistoricalOutcome(request, exactMatch.get())) {
                     log.info("Complete historical analysis found for failureId={}. Returning persisted result.", failureId);
                     return buildHistoricalOutcomeFromFeedback(failureId, exactMatch.get());
                 }
-                log.info("Historical record for failureId={} is complete but stale for the current screenshot; running enrichment analysis.", failureId);
+                if (shouldUseHistoricalContextForEnrichment(request, exactMatch.get())) {
+                    historicalFound = true;
+                    historicalContextRecord = exactMatch.get();
+                    log.info("Historical record for failureId={} is complete but stale for the current screenshot; running enrichment analysis.", failureId);
+                } else {
+                    log.info("Historical record for failureId={} is AI-only with weak current evidence; running fresh analysis without historical context.", failureId);
+                }
             }
 
             if (!historicalFound && !failureId.equals(legacyFailureId)) {
                 Optional<FailureFeedback> legacyMatch = failureFeedbackService.getFeedbackByFailureId(legacyFailureId);
                 if (legacyMatch.isPresent()) {
-                    historicalFound = true;
-                    historicalContextRecord = legacyMatch.get();
-                    failureFeedbackService.copyFeedbackToFailureId(legacyMatch.get(), failureId);
-                    Optional<FailureFeedback> aliased = failureFeedbackService.getFeedbackByFailureId(failureId);
-                    if (aliased.isPresent()) {
-                        historicalContextRecord = aliased.get();
+                    if (shouldUseHistoricalContextForEnrichment(request, legacyMatch.get())) {
+                        historicalFound = true;
+                        historicalContextRecord = legacyMatch.get();
+                        failureFeedbackService.copyFeedbackToFailureId(legacyMatch.get(), failureId);
+                        Optional<FailureFeedback> aliased = failureFeedbackService.getFeedbackByFailureId(failureId);
+                        if (aliased.isPresent()) {
+                            historicalContextRecord = aliased.get();
+                        }
+                        if (aliased.isPresent() && shouldReuseHistoricalOutcome(request, aliased.get())) {
+                            log.info("Complete historical analysis found for failureId={}. Returning persisted result.", failureId);
+                            return buildHistoricalOutcomeFromFeedback(failureId, aliased.get());
+                        }
+                        log.info("Historical analysis incomplete for failureId={}. Running enrichment analysis.", failureId);
+                    } else {
+                        log.info("Legacy historical record for failureId={} is AI-only with weak current evidence; running fresh analysis without historical context.", failureId);
                     }
-                    if (aliased.isPresent() && shouldReuseHistoricalOutcome(request, aliased.get())) {
-                        log.info("Complete historical analysis found for failureId={}. Returning persisted result.", failureId);
-                        return buildHistoricalOutcomeFromFeedback(failureId, aliased.get());
-                    }
-                    log.info("Historical analysis incomplete for failureId={}. Running enrichment analysis.", failureId);
                 }
             }
 
@@ -144,13 +152,27 @@ public class InvestigationService {
 
             long parseStart = System.nanoTime();
             try {
-                String json = normalizeResponse(repairJson(extractJson(generation.response())));
+                String json;
+                try {
+                    json = normalizeResponse(repairJson(extractJson(generation.response())));
+                } catch (IllegalArgumentException noJsonObject) {
+                    if (noJsonObject.getMessage() != null
+                            && noJsonObject.getMessage().contains("No JSON object found in Ollama response")) {
+                        json = normalizeResponse(buildFallbackJsonFromNarrative(generation.response()));
+                    } else {
+                        throw noJsonObject;
+                    }
+                }
                 InvestigationResponse parsed = objectMapper.readValue(json, InvestigationResponse.class);
                 correctHallucinatedScreenshotText(parsed, image);
                 enforceClassificationConsistency(parsed, request);
                 log.info("Updating existing failure record: {}", failureId);
                 applyHumanFeedback(failureId, request, parsed, historicalFound);
-                log.info("Updated historical analysis for failureId={} with enriched AI result.", failureId);
+                if (historicalFound) {
+                    log.info("Updated historical analysis for failureId={} with enriched AI result.", failureId);
+                } else {
+                    log.info("Completed fresh AI analysis for failureId={}.", failureId);
+                }
 
                 long parseMillis = (System.nanoTime() - parseStart) / 1_000_000;
                 long totalMillis = promptBuildMillis + generation.httpDurationMillis() + parseMillis;
@@ -253,6 +275,12 @@ public class InvestigationService {
             return false;
         }
 
+        // If the request has no technical evidence and the historical row is AI-only,
+        // prefer a fresh model pass rather than repeatedly replaying a potentially stale guess.
+        if (!hasStrongEvidence(request) && !hasHumanClassification(feedback)) {
+            return false;
+        }
+
         String failureImage = request == null ? null : request.getFailureImage();
         if (failureImage == null || failureImage.isBlank()) {
             return true;
@@ -270,6 +298,26 @@ public class InvestigationService {
 
         String currentScreenshotHash = FailureFeedbackService.calculateScreenshotHash(failureImage);
         return currentScreenshotHash != null && currentScreenshotHash.equalsIgnoreCase(historicalScreenshotHash);
+    }
+
+    private boolean hasStrongEvidence(InvestigationRequest request) {
+        if (request == null) {
+            return false;
+        }
+        boolean hasError = request.getError() != null && !request.getError().isBlank();
+        boolean hasStack = request.getStackTrace() != null && !request.getStackTrace().isBlank();
+        boolean hasImage = request.getFailureImage() != null && !request.getFailureImage().isBlank();
+        return hasError || hasStack || hasImage;
+    }
+
+    private boolean hasHumanClassification(FailureFeedback feedback) {
+        return feedback != null
+                && feedback.getHumanClassification() != null
+                && !feedback.getHumanClassification().isBlank();
+    }
+
+    private boolean shouldUseHistoricalContextForEnrichment(InvestigationRequest request, FailureFeedback feedback) {
+        return hasStrongEvidence(request) || hasHumanClassification(feedback);
     }
 
     private List<String> parseListJson(String json) {
@@ -510,9 +558,17 @@ public class InvestigationService {
             "check service status", "backend logs", "environment", "infrastructure", "network");
 
         boolean hasAppUiSignal = containsAny(merged,
-            "app ui", "button visible", "screen loaded", "page rendered", "business flow completed");
+            "button visible", "screen loaded", "page rendered", "business flow completed",
+            "app ui is visible", "app ui is loaded", "application loaded successfully");
 
-        return hasConnectivitySignal && hasInfraOwnershipSignal && !hasAppUiSignal;
+        boolean explicitConnectivityOutage =
+            containsAny(merged,
+                "err_connection_refused", "refused to connect", "this site can't be reached", "connection refused")
+            && containsAny(merged,
+                "127.0.0.1", "localhost", "service", "port");
+
+        return (hasConnectivitySignal && hasInfraOwnershipSignal && !hasAppUiSignal)
+            || explicitConnectivityOutage;
         }
 
         private boolean looksLikeTestExpectationTypo(InvestigationResponse response, InvestigationRequest request) {
@@ -630,27 +686,47 @@ public class InvestigationService {
             // fall through to repair
         }
 
-        StringBuilder result = new StringBuilder(json.length() + 16);
+        StringBuilder result = new StringBuilder(json.length() + 32);
         java.util.Deque<Character> stack = new java.util.ArrayDeque<>();
         boolean inString = false;
         boolean escape = false;
 
         for (int i = 0; i < json.length(); i++) {
             char c = json.charAt(i);
-            result.append(c);
 
             if (escape) {
+                result.append(c);
                 escape = false;
                 continue;
             }
             if (c == '\\' && inString) {
+                result.append(c);
                 escape = true;
                 continue;
             }
             if (c == '"') {
+                if (inString) {
+                    // If this quote is not followed by a valid JSON string terminator context,
+                    // treat it as an unescaped inner quote from model output and escape it.
+                    int j = i + 1;
+                    while (j < json.length() && Character.isWhitespace(json.charAt(j))) {
+                        j++;
+                    }
+                    boolean validTerminator = j >= json.length()
+                            || json.charAt(j) == ':'
+                            || json.charAt(j) == ','
+                            || json.charAt(j) == '}'
+                            || json.charAt(j) == ']';
+                    if (!validTerminator) {
+                        result.append('\\').append('"');
+                        continue;
+                    }
+                }
+                result.append(c);
                 inString = !inString;
                 continue;
             }
+            result.append(c);
             if (inString) continue;
 
             if (c == '{' || c == '[') {
@@ -706,6 +782,47 @@ public class InvestigationService {
             object.put("confidence", 0);
         }
         return objectMapper.writeValueAsString(object);
+    }
+
+    private String buildFallbackJsonFromNarrative(String narrative) throws Exception {
+        String text = narrative == null ? "" : narrative.trim();
+        if (text.isEmpty()) {
+            throw new IllegalArgumentException("No JSON object found in Ollama response");
+        }
+
+        String upper = text.toUpperCase();
+        String classification = "UNKNOWN";
+        if (upper.contains("AUTOMATION_ISSUE")) classification = "AUTOMATION_ISSUE";
+        else if (upper.contains("APPLICATION_ISSUE")) classification = "APPLICATION_ISSUE";
+        else if (upper.contains("API_ISSUE")) classification = "API_ISSUE";
+        else if (upper.contains("DATA_ISSUE")) classification = "DATA_ISSUE";
+        else if (upper.contains("ENVIRONMENT_ISSUE")) classification = "ENVIRONMENT_ISSUE";
+        else if (upper.contains("NETWORK_ISSUE")) classification = "NETWORK_ISSUE";
+
+        String rootCause = text;
+        int boundary = text.indexOf("\n\n");
+        if (boundary > 0) {
+            rootCause = text.substring(0, boundary).trim();
+        }
+        if (rootCause.length() > 900) {
+            rootCause = rootCause.substring(0, 900);
+        }
+
+        ObjectNode fallback = objectMapper.createObjectNode();
+        fallback.put("classification", classification);
+        fallback.put("rootCauseType", "POSSIBLE");
+        fallback.put("rootCause", rootCause);
+        fallback.put("screenshotObservation", "No structured screenshot observation provided by AI response.");
+        fallback.put("confidence", 35);
+        fallback.putArray("evidence");
+        fallback.putArray("missingEvidence");
+        fallback.put("severity", "MEDIUM");
+        fallback.put("recommendedAction", "Regenerate investigation response in strict JSON format and validate key fields before use.");
+        fallback.put("suggestedFix", "Ensure model output is valid JSON object with escaped quotes in string values.");
+        fallback.putArray("stepsToReproduce");
+        fallback.putArray("preventionTips");
+        fallback.put("similarPatterns", "Model returned narrative/prose instead of required JSON payload.");
+        return objectMapper.writeValueAsString(fallback);
     }
 
     private void normalizeString(ObjectNode object, String field) {

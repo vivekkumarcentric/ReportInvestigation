@@ -35,9 +35,18 @@ public final class FailureIdGenerator {
      * normalizes volatile tokens (ids/indexes/uuids/large numbers) from the error signature.
      */
     public static String generate(String scenario, String feature, String failedStep, String error) {
-        String basis = normalizeStep(failedStep) + "|"
-                + normalizeExceptionType(error) + "|"
-                + normalizeErrorSignature(error);
+        String normalizedStep = normalizeStep(failedStep);
+        String exceptionType = normalizeExceptionType(error);
+        String errorSignature = normalizeErrorSignature(error);
+
+        String basis;
+        if (exceptionType.isBlank() && errorSignature.isBlank()) {
+            // When no technical error signal is available, include scenario/feature to avoid
+            // over-collapsing unrelated business failures into one historical id bucket.
+            basis = normalizedStep + "|" + normalize(scenario) + "|" + normalize(feature);
+        } else {
+            basis = normalizedStep + "|" + exceptionType + "|" + errorSignature;
+        }
         return sha256Hex(basis).substring(0, 16);
     }
 

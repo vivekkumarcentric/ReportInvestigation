@@ -12,6 +12,10 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -369,6 +373,48 @@ class ReportInvestigationServiceTest {
 
         verify(investigationService, times(2))
                 .investigateWithMetrics(any(InvestigationRequest.class), anyString());
+    }
+
+    @Test
+    void differentGroups_areAnalyzedInParallel() throws Exception {
+        CountDownLatch startLatch = new CountDownLatch(3);
+        CountDownLatch releaseLatch = new CountDownLatch(1);
+        AtomicInteger inFlight = new AtomicInteger();
+        AtomicInteger maxInFlight = new AtomicInteger();
+
+        when(investigationService.investigateWithMetrics(any(InvestigationRequest.class), anyString()))
+                .thenAnswer(invocation -> {
+                    int current = inFlight.incrementAndGet();
+                    maxInFlight.accumulateAndGet(current, Math::max);
+                    startLatch.countDown();
+                    try {
+                        releaseLatch.await(2, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    inFlight.decrementAndGet();
+                    InvestigationResponse response = new InvestigationResponse();
+                    response.setClassification("AUTOMATION_ISSUE");
+                    response.setSeverity("MEDIUM");
+                    return new InvestigationService.InvestigationOutcome(response, List.of());
+                });
+
+        ReportFailure f1 = failure("Then user navigates to cart", "java.lang.AssertionError: expected [1] but found [0]", null, null);
+        ReportFailure f2 = failure("Then user filters the product list", "org.openqa.selenium.TimeoutException: waiting for visibility of element", null, null);
+        ReportFailure f3 = failure("Then checkout renders payment screen", "java.net.ConnectException: Connection refused", null, null);
+
+        ReportInvestigationRequest request = new ReportInvestigationRequest();
+        request.setReportType("EXTENT");
+        request.setFailures(List.of(f1, f2, f3));
+
+        CompletableFuture<ReportInvestigationService.ReportAnalysisResult> future = CompletableFuture
+                .supplyAsync(() -> reportInvestigationService.analyzeReport(request));
+
+        assertThat(startLatch.await(2, TimeUnit.SECONDS)).isTrue();
+        assertThat(maxInFlight.get()).isGreaterThan(1);
+
+        releaseLatch.countDown();
+        future.get(5, TimeUnit.SECONDS);
     }
 }
 

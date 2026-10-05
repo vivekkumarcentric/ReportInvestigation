@@ -2843,9 +2843,25 @@ ${data.result.preventionTips ? `Prevention Tips:\n${data.result.preventionTips.m
 
               // E. Failure Image
               const context = scenarioContainer || stepNode;
-              const screenshotLinks = context.querySelectorAll(".screenshots a[href^='data:image'], .screenshots img[src^='data:image'], a[href^='data:image'], img[src^='data:image']");
+              const screenshotLinks = Array.from((context || document).querySelectorAll("a[href], img[src]"))
+                  .filter(el => {
+                      const href = (el.getAttribute("href") || "").trim();
+                      const src = (el.getAttribute("src") || "").trim();
+                      return (href.startsWith("data:image/") || src.startsWith("data:image/"))
+                          || href.includes("base64")
+                          || src.includes("base64");
+                  });
+
               if (screenshotLinks.length > 0) {
-                  failureImage = screenshotLinks[screenshotLinks.length - 1].getAttribute("href") || screenshotLinks[screenshotLinks.length - 1].getAttribute("src");
+                  const preferredLink = screenshotLinks
+                      .map(el => ({
+                          element: el,
+                          value: (el.getAttribute("href") || el.getAttribute("src") || "").trim()
+                      }))
+                      .filter(item => item.value)
+                      .sort((a, b) => b.value.length - a.value.length)[0];
+
+                  failureImage = preferredLink ? preferredLink.value : "";
               }
 
               // F. Validation: Skip if we couldn't resolve a valid scenario name

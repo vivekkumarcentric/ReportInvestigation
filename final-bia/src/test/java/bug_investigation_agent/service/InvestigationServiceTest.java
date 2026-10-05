@@ -135,6 +135,68 @@ class InvestigationServiceTest {
         assertThat(outcome.callMetrics()).hasSize(1);
     }
 
+    @Test
+    void malformedUnescapedInnerQuotesInAiJson_areRepairedAndParsed() {
+        InvestigationRequest request = request();
+        when(failureFeedbackService.getFeedbackByFailureId(anyString())).thenReturn(Optional.empty());
+        when(promptBuilder.buildPrompt(any(InvestigationRequest.class), nullable(String.class))).thenReturn("prompt text");
+        when(failureFeedbackService.getClassification(anyString())).thenReturn(Optional.empty());
+
+        String malformedJson = "{" 
+                + "\"classification\":\"AUTOMATION_ISSUE\"," 
+                + "\"rootCauseType\":\"CONFIRMED\"," 
+                + "\"rootCause\":\"The error message 'Then the heading should contain \"Everyday geer\"' suggests a locator mismatch.\"," 
+                + "\"confidence\":90,"
+                + "\"severity\":\"MEDIUM\"," 
+                + "\"recommendedAction\":\"Update locator\"," 
+                + "\"suggestedFix\":\"Fix selector\"," 
+                + "\"stepsToReproduce\":[\"Open storefront\"],"
+                + "\"evidence\":[\"Heading mismatch\"],"
+                + "\"missingEvidence\":[\"Stack trace\"],"
+                + "\"preventionTips\":[\"Keep locators updated\"],"
+                + "\"similarPatterns\":\"Locator drift\""
+                + "}";
+
+        // Simulate model output with invalid JSON quote escaping in a string field.
+        String malformedModelOutput = malformedJson.replace("\\\"Everyday geer\\\"", "\"Everyday geer\"");
+
+        OllamaClient.OllamaGenerationResult generation =
+                new OllamaClient.OllamaGenerationResult(malformedModelOutput, "qwen2.5:7b", false, 10L, 100, 50);
+        when(ollamaClient.generateWithMetrics(anyString(), any())).thenReturn(generation);
+
+        InvestigationService.InvestigationOutcome outcome =
+                investigationService.investigateWithMetrics(request, "verify checkout flow");
+
+        assertThat(outcome.response().getClassification()).isEqualTo("AUTOMATION_ISSUE");
+        assertThat(outcome.response().getRootCause()).contains("Everyday geer");
+        assertThat(outcome.response().getSource()).isEqualTo(FailureFeedbackService.SOURCE_AI);
+        assertThat(outcome.callMetrics()).hasSize(1);
+    }
+
+    @Test
+    void proseOnlyAiResponseWithoutJson_isConvertedToFallbackStructuredResponse() {
+        InvestigationRequest request = request();
+        when(failureFeedbackService.getFeedbackByFailureId(anyString())).thenReturn(Optional.empty());
+        when(promptBuilder.buildPrompt(any(InvestigationRequest.class), nullable(String.class))).thenReturn("prompt text");
+        when(failureFeedbackService.getClassification(anyString())).thenReturn(Optional.empty());
+
+        String proseOnly = "Based on the provided failure evidence, the most probable root cause is AUTOMATION_ISSUE. "
+                + "This appears to be a timing and locator stability problem rather than an application defect.";
+
+        when(ollamaClient.generateWithMetrics(anyString(), any()))
+                .thenReturn(new OllamaClient.OllamaGenerationResult(proseOnly, "qwen2.5:7b", false, 10L, 100, 50));
+
+        InvestigationService.InvestigationOutcome outcome =
+                investigationService.investigateWithMetrics(request, "verify checkout flow");
+
+        assertThat(outcome.response().getClassification()).isEqualTo("AUTOMATION_ISSUE");
+        assertThat(outcome.response().getRootCause()).contains("AUTOMATION_ISSUE");
+        assertThat(outcome.response().getRootCauseType()).isEqualTo("POSSIBLE");
+        assertThat(outcome.response().getConfidence()).isEqualTo(35);
+        assertThat(outcome.response().getSource()).isEqualTo(FailureFeedbackService.SOURCE_AI);
+        assertThat(outcome.callMetrics()).hasSize(1);
+    }
+
         @Test
         void exactDbHitWithAiOnlyRecord_shortCircuitsAndDoesNotCallOllama() {
                 InvestigationRequest request = request();
@@ -176,6 +238,48 @@ class InvestigationServiceTest {
                 verifyNoInteractions(ollamaClient);
                 verifyNoInteractions(promptBuilder);
         }
+
+    @Test
+    void aiOnlyHistoricalWithoutErrorStackOrScreenshot_triggersFreshAnalysis() {
+        InvestigationRequest request = new InvestigationRequest();
+        request.setScenario("SAVE10 should apply a ten percent discount");
+        request.setFeature("Storefront shopping flow");
+        request.setFailedStep("Then the discount for promo code \"SAVE10\" should equal 10 percent of the item price for SKU \"NS-101\"");
+        request.setError("");
+        request.setStackTrace("");
+        request.setFailureImage("");
+
+        String failureId = FailureIdGenerator.generate(
+                request.getScenario(), request.getFeature(), request.getFailedStep(), request.getError());
+
+        FailureFeedback historical = new FailureFeedback();
+        historical.setFailureId(failureId);
+        historical.setAiClassification("APPLICATION_ISSUE");
+        historical.setHumanClassification(null);
+        historical.setRootCause("Historical AI-only guess");
+        historical.setRootCauseType("POSSIBLE");
+        historical.setConfidence(60);
+        historical.setSeverity("MEDIUM");
+        historical.setRecommendedAction("Historical action");
+        historical.setSuggestedFix("Historical fix");
+        historical.setSource(FailureFeedbackService.SOURCE_AI);
+
+        when(failureFeedbackService.getFeedbackByFailureId(failureId)).thenReturn(Optional.of(historical));
+        when(failureFeedbackService.isAnalysisComplete(historical)).thenReturn(true);
+        when(promptBuilder.buildPrompt(any(InvestigationRequest.class), nullable(String.class))).thenReturn("prompt text");
+        when(failureFeedbackService.getClassification(anyString())).thenReturn(Optional.empty());
+        when(ollamaClient.generateWithMetrics(anyString(), any())).thenReturn(
+                new OllamaClient.OllamaGenerationResult(
+                        "{\"classification\":\"AUTOMATION_ISSUE\",\"rootCause\":\"Fresh run\",\"confidence\":70,\"severity\":\"MEDIUM\",\"rootCauseType\":\"POSSIBLE\"}",
+                        "qwen2.5:7b", false, 10L, 100, 50));
+
+        InvestigationService.InvestigationOutcome outcome =
+                investigationService.investigateWithMetrics(request, request.getScenario());
+
+        assertThat(outcome.response().getClassification()).isEqualTo("AUTOMATION_ISSUE");
+        assertThat(outcome.response().getSource()).isEqualTo(FailureFeedbackService.SOURCE_AI);
+        assertThat(outcome.callMetrics()).hasSize(1);
+    }
 
     @Test
     void currentScreenshotOverridesStaleHistoricalNoScreenshotObservation() {

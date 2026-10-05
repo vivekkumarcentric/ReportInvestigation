@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -60,6 +61,8 @@ public class ReportInvestigationService {
             failures = new ArrayList<>();
         }
 
+        final List<ReportFailure> allFailures = new ArrayList<>(failures);
+
         /*
          * Pre-cluster failures BEFORE calling the AI: many failures across test cases share the
          * same underlying failed step/exception/locator/error pattern (e.g. the same locator
@@ -70,17 +73,17 @@ public class ReportInvestigationService {
          * information-rich member as the representative - preferring one with a screenshot
          * attached), then apply that single investigation result to every failure in the group.
          */
-        List<FailureComponents> components = new ArrayList<>(failures.size());
-        for (ReportFailure failure : failures) {
+        List<FailureComponents> components = new ArrayList<>(allFailures.size());
+        for (ReportFailure failure : allFailures) {
             components.add(extractComponents(failure));
         }
 
         // Also compute the OLD exact-signature grouping purely for metrics/comparison purposes.
-        int oldExactGroups = countOldExactSignatureGroups(failures);
+        int oldExactGroups = countOldExactSignatureGroups(allFailures);
 
         Map<Integer, List<Integer>> groupsByRepresentative = groupFailuresBySimilarity(components);
 
-        InvestigationResponse[] investigationByIndex = new InvestigationResponse[failures.size()];
+        InvestigationResponse[] investigationByIndex = new InvestigationResponse[allFailures.size()];
 
         // Report-level metrics accumulators (measurement only - no behavior/logic change).
         int ollamaCalls = 0;
@@ -89,36 +92,55 @@ public class ReportInvestigationService {
         int visionCalls = 0;
         long totalOllamaTimeMillis = 0;
 
+        List<CompletableFuture<GroupAnalysisResult>> groupAnalyses = new ArrayList<>();
         for (List<Integer> indices : groupsByRepresentative.values()) {
-            int representativeIndex = pickRepresentative(failures, indices);
-            ReportFailure representative = failures.get(representativeIndex);
+            groupAnalyses.add(CompletableFuture.supplyAsync(() -> {
+                int representativeIndex = pickRepresentative(allFailures, indices);
+                ReportFailure representative = allFailures.get(representativeIndex);
 
-            InvestigationRequest investigationRequest = requestMapper.map(representative);
-            String scenarioId = representative.getScenarioName() != null && !representative.getScenarioName().isBlank()
-                    ? representative.getScenarioName()
-                    : representative.getTestCaseID();
+                InvestigationRequest investigationRequest = requestMapper.map(representative);
+                String scenarioId = representative.getScenarioName() != null && !representative.getScenarioName().isBlank()
+                        ? representative.getScenarioName()
+                        : representative.getTestCaseID();
 
-            InvestigationService.InvestigationOutcome outcome =
-                    investigationService.investigateWithMetrics(investigationRequest, scenarioId);
-            InvestigationResponse investigation = outcome.response();
+                InvestigationService.InvestigationOutcome outcome =
+                        investigationService.investigateWithMetrics(investigationRequest, scenarioId);
+                InvestigationResponse investigation = outcome.response();
 
-            ollamaCalls++;
-            List<InvestigationService.OllamaCallMetrics> callMetrics = outcome.callMetrics();
-            if (!callMetrics.isEmpty()) {
-                boolean vision = callMetrics.get(0).vision();
-                if (vision) {
-                    visionCalls++;
-                } else {
-                    textCalls++;
+                List<InvestigationService.OllamaCallMetrics> callMetrics = outcome.callMetrics();
+                int groupOllamaCalls = 1;
+                int groupRetries = 0;
+                int groupTextCalls = 0;
+                int groupVisionCalls = 0;
+                long groupOllamaTimeMillis = 0L;
+                if (!callMetrics.isEmpty()) {
+                    boolean vision = callMetrics.get(0).vision();
+                    if (vision) {
+                        groupVisionCalls++;
+                    } else {
+                        groupTextCalls++;
+                    }
+                    groupRetries += Math.max(0, callMetrics.size() - 1);
+                    for (InvestigationService.OllamaCallMetrics metrics : callMetrics) {
+                        groupOllamaTimeMillis += metrics.totalMillis();
+                    }
                 }
-                retries += Math.max(0, callMetrics.size() - 1);
-                for (InvestigationService.OllamaCallMetrics metrics : callMetrics) {
-                    totalOllamaTimeMillis += metrics.totalMillis();
-                }
-            }
 
-            for (int index : indices) {
-                investigationByIndex[index] = investigation;
+                return new GroupAnalysisResult(indices, investigation, groupOllamaCalls,
+                        groupRetries, groupTextCalls, groupVisionCalls, groupOllamaTimeMillis);
+            }));
+        }
+
+        for (CompletableFuture<GroupAnalysisResult> groupAnalysis : groupAnalyses) {
+            GroupAnalysisResult result = groupAnalysis.join();
+            ollamaCalls += result.ollamaCalls();
+            retries += result.retries();
+            textCalls += result.textCalls();
+            visionCalls += result.visionCalls();
+            totalOllamaTimeMillis += result.totalOllamaTimeMillis();
+
+            for (int index : result.indices()) {
+                investigationByIndex[index] = result.investigation();
             }
         }
 
@@ -127,8 +149,8 @@ public class ReportInvestigationService {
          * investigation result for failures that were clustered together.
          */
         List<FailureInvestigation> investigations = new ArrayList<>();
-        for (int i = 0; i < failures.size(); i++) {
-            ReportFailure failure = failures.get(i);
+        for (int i = 0; i < allFailures.size(); i++) {
+            ReportFailure failure = allFailures.get(i);
 
             FailureInvestigation failureInvestigation =
                     new FailureInvestigation(
@@ -163,7 +185,7 @@ public class ReportInvestigationService {
 
         long totalAnalysisMillis = (System.nanoTime() - analysisStart) / 1_000_000;
         logReportMetrics(
-                failures.size(), oldExactGroups, groupsByRepresentative.size(), ollamaCalls, retries,
+                allFailures.size(), oldExactGroups, groupsByRepresentative.size(), ollamaCalls, retries,
                 textCalls, visionCalls, totalOllamaTimeMillis, totalAnalysisMillis);
 
         return new ReportAnalysisResult(
@@ -171,6 +193,16 @@ public class ReportInvestigationService {
                 clustering,
                 summary
         );
+    }
+
+    private record GroupAnalysisResult(
+            List<Integer> indices,
+            InvestigationResponse investigation,
+            int ollamaCalls,
+            int retries,
+            int textCalls,
+            int visionCalls,
+            long totalOllamaTimeMillis) {
     }
 
     private void logReportMetrics(

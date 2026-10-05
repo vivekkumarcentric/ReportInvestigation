@@ -14,32 +14,34 @@ import static org.junit.jupiter.api.Assertions.*;
 class HtmlReportParserTest {
 
     @Test
-    void shouldParseExtentFailuresUsingExistingAnalyzer() throws Exception {
-        String html = Files.readString(Path.of(
-                "src/test/resources/PepsiCo_Automation_SparkReport_nz-19.html"));
+    void shouldParseJsonExtentFailuresFromAutomationReport() throws Exception {
+        String reportJson = Files.readString(Path.of(
+                "src/test/resources/automation-report.json"));
 
         HtmlReportParser parser = new HtmlReportParser(new ReportParserService());
-        List<FailureRecord> failures = parser.parse(html, "EXTENT");
+        List<FailureRecord> failures = parser.parse(reportJson, "EXTENT");
 
-        assertEquals(36, failures.size());
+        assertEquals(10, failures.size());
 
         FailureRecord first = failures.stream()
-                .filter(f -> "15,699".equals(f.getTestCaseId()))
+                .filter(f -> "Changing quantity recalculates subtotal".equals(f.getScenarioName()))
                 .findFirst()
                 .orElseThrow();
 
-        assertEquals("verify your profile screen functionalities", first.getScenarioName());
-        assertEquals("And user select a photo from photo library for pepsico3.1", first.getFailedStep());
-        assertTrue(first.getErrorMessage().contains("TimeoutException"));
-        assertTrue(first.getErrorMessage().contains("CommonPage.userSelectPhotoBySelectingPhotoLibrary"));
+        assertEquals("Then the heading should contain \"Everyday geer\"", first.getFailedStep());
+        assertFalse(first.getErrorMessage().isBlank());
+        assertTrue(first.getScenarioName().contains("Changing quantity"));
+    }
 
-        FailureRecord second = failures.stream()
-                .filter(f -> "17,807".equals(f.getTestCaseId()))
-                .findFirst()
-                .orElseThrow();
+    @Test
+    void shouldAcceptJsonExtentInputWithoutHtmlFixtures() throws Exception {
+        String reportJson = Files.readString(Path.of(
+                "src/test/resources/automation-report.json"));
 
-        assertEquals("Games scenarios", second.getScenarioName());
-        assertEquals("And user verify activity event name as \"Game played\" on your points breakdown screen for pepsico3.1", second.getFailedStep());
-        assertTrue(second.getErrorMessage().contains("PLACED AN ORDER"));
+        HtmlReportParser parser = new HtmlReportParser(new ReportParserService());
+        List<FailureRecord> failures = parser.parse(reportJson, "EXTENT");
+
+        assertTrue(failures.stream().anyMatch(f -> f.getFeatureName() != null && !f.getFeatureName().isBlank()));
+        assertTrue(failures.stream().anyMatch(f -> f.getFailedStep() != null && f.getFailedStep().contains("Everyday geer")));
     }
 }

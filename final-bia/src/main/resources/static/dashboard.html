@@ -1621,6 +1621,11 @@
                 return;
             }
 
+            reportData = null;
+            failureGroups = [];
+            failuresById.clear();
+            failureIdCounter = 0;
+
             const uploadArea = document.getElementById('uploadArea');
             const fileInfo = document.getElementById('fileInfo');
             const fileNameEl = document.getElementById('fileName');
@@ -1861,27 +1866,151 @@
             return null;
         }
 
-        // Extracts a base64/path screenshot from a single step node, checking both
-        // step.media (array, used by some steps) and each log entry's media (object,
-        // commonly used by ExtentReports for hook-level attachments like afterScenario).
+        // Extracts screenshot evidence from common media/attachment locations used by
+        // different report generators.
         function extractScreenshotFromStepNode(step) {
             if (!step) return null;
             if (Array.isArray(step.media) && step.media.length > 0) {
-                const found = step.media.find(m => m && (m.base64 || m.path));
-                if (found) return found.base64 || found.path;
+                for (const mediaItem of step.media) {
+                    const candidate = extractScreenshotFromAny(mediaItem);
+                    if (candidate) return candidate;
+                }
             }
             if (Array.isArray(step.logs)) {
                 for (const log of step.logs) {
-                    const media = log && log.media;
-                    if (!media) continue;
-                    if (Array.isArray(media)) {
-                        const found = media.find(m => m && (m.base64 || m.path));
-                        if (found) return found.base64 || found.path;
-                    } else if (media.base64 || media.path) {
-                        return media.base64 || media.path;
-                    }
+                    const mediaCandidate = extractScreenshotFromAny(log && log.media);
+                    if (mediaCandidate) return mediaCandidate;
+
+                    const detailsCandidate = extractScreenshotFromAny(log && log.details);
+                    if (detailsCandidate) return detailsCandidate;
                 }
             }
+
+            // Fallback for formats that put attachments directly on the step object.
+            const directCandidate = extractScreenshotFromAny(step);
+            if (directCandidate) return directCandidate;
+
+            return null;
+        }
+
+        function normalizeImageString(value) {
+            if (!value) return null;
+            const text = String(value).trim();
+            if (!text) return null;
+
+            const directDataUri = text.match(/data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+/i);
+            if (directDataUri && directDataUri[0]) {
+                return directDataUri[0].replace(/\s+/g, '');
+            }
+
+            const htmlAttrMatch = text.match(/(?:href|src)\s*=\s*["'](data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+)["']/i);
+            if (htmlAttrMatch && htmlAttrMatch[1]) {
+                return htmlAttrMatch[1].replace(/\s+/g, '');
+            }
+
+            if (text.startsWith('data:image')) return text;
+            if (text.startsWith('http://') || text.startsWith('https://')) return text;
+            if (/(\.png|\.jpg|\.jpeg|\.gif|\.webp|\.bmp)(\?|$)/i.test(text)) return text;
+            if (/screenshot|screen-shot|screen_shot|attachment|image/i.test(text)
+                && (/^\/?[A-Za-z0-9._\-/]+$/).test(text)) {
+                return text;
+            }
+
+            return null;
+        }
+
+        function extractScreenshotFromAny(value, depth = 0) {
+            if (value == null || depth > 8) return null;
+
+            if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+                return normalizeImageString(value);
+            }
+
+            if (Array.isArray(value)) {
+                for (const item of value) {
+                    const found = extractScreenshotFromAny(item, depth + 1);
+                    if (found) return found;
+                }
+                return null;
+            }
+
+            if (typeof value !== 'object') return null;
+
+            // Cucumber embedding format: { mime_type: 'image/png', data: '<base64>' }
+            const mimeType = value.mime_type || value.mimeType || value.type || '';
+            const imageData = value.data || value.base64 || value.bytes || null;
+            if (typeof mimeType === 'string' && mimeType.toLowerCase().startsWith('image/') && imageData) {
+                const cleaned = String(imageData).replace(/\s+/g, '');
+                if (cleaned.startsWith('data:image')) return cleaned;
+                return `data:${mimeType};base64,${cleaned}`;
+            }
+
+            // Extent/adapter JSON sometimes stores screenshot bytes as raw base64 under
+            // media objects (e.g. { title: "Screenshot", base64: "iVBOR..." }) without mime type.
+            const rawBase64 = value.base64 || value.bytes || value.imageBase64 || value.screenshotBase64 || null;
+            if (rawBase64) {
+                const cleaned = String(rawBase64).replace(/\s+/g, '');
+                const inferredMime = inferImageMimeType(value);
+                if (isLikelyBase64(cleaned) && inferredMime) {
+                    return `data:${inferredMime};base64,${cleaned}`;
+                }
+            }
+
+            const prioritizedKeys = [
+                'failureImage', 'failure_image', 'screenshot', 'screenShot', 'screenshotBase64',
+                'image', 'base64', 'data', 'path', 'src', 'href', 'url',
+                'attachment', 'attachments', 'embedding', 'embeddings', 'media', 'logs', 'details'
+            ];
+
+            for (const key of prioritizedKeys) {
+                if (!(key in value)) continue;
+                const found = extractScreenshotFromAny(value[key], depth + 1);
+                if (found) return found;
+            }
+
+            for (const nested of Object.values(value)) {
+                const found = extractScreenshotFromAny(nested, depth + 1);
+                if (found) return found;
+            }
+
+            return null;
+        }
+
+        function isLikelyBase64(value) {
+            if (!value || typeof value !== 'string') return false;
+            if (value.length < 64) return false;
+            return /^[A-Za-z0-9+/=]+$/.test(value);
+        }
+
+        function inferImageMimeType(obj) {
+            if (!obj || typeof obj !== 'object') return null;
+
+            const explicitMime = [
+                obj.mime_type,
+                obj.mimeType,
+                obj.contentType,
+                obj.content_type,
+                obj.mediaType,
+                obj.type
+            ].find(v => typeof v === 'string' && v.toLowerCase().startsWith('image/'));
+            if (explicitMime) return explicitMime;
+
+            const hintText = [obj.title, obj.name, obj.label, obj.description]
+                .filter(v => typeof v === 'string')
+                .join(' ')
+                .toLowerCase();
+
+            if (/\bjpeg\b|\bjpg\b/.test(hintText)) return 'image/jpeg';
+            if (/\bwebp\b/.test(hintText)) return 'image/webp';
+            if (/\bgif\b/.test(hintText)) return 'image/gif';
+            if (/\bbmp\b/.test(hintText)) return 'image/bmp';
+            if (/\bpng\b/.test(hintText)) return 'image/png';
+
+            // Generic screenshot/image attachment fallback.
+            if (/screenshot|screen-shot|screen_shot|snapshot|image|attachment/.test(hintText)) {
+                return 'image/png';
+            }
+
             return null;
         }
 
@@ -1980,7 +2109,7 @@
             const failedStep = item.failedStep || item.failed_step || item.failedStepLine || item.step || item.failingStep || item.failure_step || (status === 'fail' ? 'Step information not available' : null);
             const rawError = item.error || item.errorMessage || item.error_message || item.message || item.failure || item.failureMessage || item.stackTrace || item.stack_trace || item.trace || (status === 'fail' ? 'Error details not available' : null);
             const error = normalizeToText(rawError);
-            const screenshot = item.screenshot || item.image || item.failureImage || item.failure_image || item.screenshotBase64 || null;
+            const screenshot = extractScreenshotFromAny(item);
             const videoUrl = item.videoUrl || item.video || '';
             const testCaseId = item.testCaseID || item.test_case_id || item.id || item.testId || '';
             const feature = item.feature || item.featureName || item.suite || item.category || '';
@@ -2040,10 +2169,10 @@
                 failuresById.set(f._failureId, f);
             });
 
-            let processedCount = 0;
-            for (const failure of classified.failures) {
-                processedCount++;
+            const tasks = classified.failures.map(async (failure, index) => {
+                const processedCount = index + 1;
                 updateLoadingMessage(`Analyzing failure ${processedCount} of ${classified.failures.length}...`);
+
                 try {
                     const aiAnalysis = await analyzeFailureWithAI(failure);
                     const mappedClassification = mapAIClassification(aiAnalysis.classification);
@@ -2051,16 +2180,12 @@
                     failure.confidence = aiAnalysis.confidence || 50;
                     failure.reason = firstText(aiAnalysis.rootCause, 'AI analysis completed');
                     failure.aiAnalysis = normalizeAnalysis(aiAnalysis);
-                    // Real backend-generated failure identity + human-classification-feedback
-                    // state (see FailureFeedbackController / InvestigationResponse). Used by the
-                    // Root Cause tab's "Change Classification" control - must NOT use the
-                    // temporary local f1/f2 UI id (failure._failureId) for the backend call.
                     failure.backendFailureId = aiAnalysis.failureId || null;
                     failure.rawClassification = firstText(aiAnalysis.classification, null);
                     failure.aiClassificationRaw = firstText(aiAnalysis.aiClassification, failure.rawClassification);
                     failure.humanClassificationRaw = aiAnalysis.humanClassification || null;
                     failure.classificationSource = firstText(aiAnalysis.source, 'AI');
-                    classified.classifications[mappedClassification]++;
+                    return { failure, classification: mappedClassification };
                 } catch (error) {
                     console.error('AI analysis failed for:', failure.name, error);
                     const classification = classifyFailure(failure);
@@ -2068,9 +2193,16 @@
                     failure.confidence = classification.confidence;
                     failure.reason = classification.reason;
                     failure.aiAnalysis = normalizeAnalysis({ classification: classification.type, rootCauseType: 'PROBABLE', rootCause: classification.reason, severity: 'MEDIUM', confidence: classification.confidence, evidence: [], missingEvidence: [], recommendedAction: '', suggestedFix: '', stepsToReproduce: [], preventionTips: [], similarPatterns: '', screenshotObservation: '' });
-                    classified.classifications[classification.type]++;
+                    return { failure, classification: classification.type };
                 }
-            }
+            });
+
+            const settled = await Promise.allSettled(tasks);
+            settled.forEach((result) => {
+                if (result.status === 'fulfilled') {
+                    classified.classifications[result.value.classification]++;
+                }
+            });
 
             failureGroups = groupSimilarFailures(classified.failures);
             return classified;
@@ -2118,11 +2250,11 @@
                 }))
             };
 
-            const response = await fetch('/api/investigations', {
+            const response = await fetchWithTimeout('/api/investigations', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody)
-            });
+            }, 15000);
 
             if (!response.ok) {
                 const errorText = await response.text();
@@ -2130,6 +2262,17 @@
             }
 
             return await response.json();
+        }
+
+        async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+            try {
+                return await fetch(url, { ...options, signal: controller.signal });
+            } finally {
+                clearTimeout(timer);
+            }
         }
 
         // Downscales and re-compresses a base64/data-URI screenshot before sending it to the
