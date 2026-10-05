@@ -54,6 +54,13 @@ public class InvestigationPromptBuilder {
                 - Examine the screenshot for: error dialogs, toasts, wrong screen/state, missing/blank elements, incorrect data, spinners,
                   network banners, or any visual anomaly. Use it to confirm/refute the hypothesis.
                 - FIRST determine the ACTUAL application state from the screenshot, then correlate with failed step expectation.
+                                - CLASSIFICATION PRECEDENCE (web/service availability): if screenshot/error explicitly shows connection-level failures such as
+                                    "This site can't be reached", "ERR_CONNECTION_REFUSED", "ERR_NAME_NOT_RESOLVED", "ERR_CONNECTION_TIMED_OUT",
+                                    "refused to connect", "connection reset", "502/503/504", gateway/proxy unavailable, DNS resolution failure,
+                                    or target host/port unreachable, classify as ENVIRONMENT_ISSUE or NETWORK_ISSUE (choose NETWORK_ISSUE when
+                                    the evidence is clearly connectivity/routing/DNS related). Do NOT classify these as APPLICATION_ISSUE.
+                                - If the primary failure is service unavailability/connectivity before any app page is rendered, do NOT classify as
+                                    AUTOMATION_ISSUE even when the failing step is a navigation/open-url step.
                 - TimeoutException/NoSuchElementException are SYMPTOMS, not root causes. They MUST NOT by themselves justify AUTOMATION_ISSUE.
                 - Before assigning AUTOMATION_ISSUE for a NoSuchElementException/TimeoutException, prove from screenshot + evidence that
                   the application was actually in the CORRECT expected state and that failure is attributable to automation locator/wait
@@ -66,6 +73,10 @@ public class InvestigationPromptBuilder {
                 - If expected UI/business element is absent from an otherwise valid screen for a step that explicitly expects it,
                   treat that as APPLICATION_ISSUE unless concrete evidence proves locator definition is wrong.
                 - Do not assume absent element means locator is wrong.
+                                - If screenshot clearly shows the expected target element is present/visible on the correct screen, but the failure is
+                                    NoSuchElementException/element-not-found/timeout-to-find-element, classify as AUTOMATION_ISSUE.
+                                - In that case, root cause must call out probable locator/wait instability (wrong selector, stale locator,
+                                    insufficient wait/synchronization, wrong frame/context), not an app/environment defect.
                 - AUTOMATION_ISSUE is appropriate when app state appears correct but automation cannot locate/interact due to wrong/
                   unstable locator, wrong accessibility id/resource-id, incorrect waits, stale element, or page object/step implementation issue.
                 - If screenshot evidence and exception evidence conflict, use POSSIBLE and explain the conflict instead of defaulting

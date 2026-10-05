@@ -147,6 +147,7 @@ public class InvestigationService {
                 String json = normalizeResponse(repairJson(extractJson(generation.response())));
                 InvestigationResponse parsed = objectMapper.readValue(json, InvestigationResponse.class);
                 correctHallucinatedScreenshotText(parsed, image);
+                enforceClassificationConsistency(request, parsed);
                 log.info("Updating existing failure record: {}", failureId);
                 applyHumanFeedback(failureId, request, parsed, historicalFound);
                 log.info("Updated historical analysis for failureId={} with enriched AI result.", failureId);
@@ -243,6 +244,7 @@ public class InvestigationService {
         response.setMissingEvidence(parseListJson(feedback.getMissingEvidenceJson()));
         response.setPreventionTips(parseListJson(feedback.getPreventionTipsJson()));
         response.setStepsToReproduce(parseListJson(feedback.getStepsToReproduceJson()));
+        enforceClassificationConsistency(null, response);
 
         return new InvestigationOutcome(response, new ArrayList<>());
     }
@@ -425,6 +427,115 @@ public class InvestigationService {
         if (normalized.contains("no screenshot") || normalized.contains("not provided")) {
             response.setScreenshotObservation(SCREENSHOT_FALLBACK_OBSERVATION);
         }
+    }
+
+    /**
+     * Applies deterministic guardrails for high-confidence misclassification patterns.
+     *
+     * Current guardrail: if evidence says the expected element is visibly present on the
+     * screenshot/ready screen, but the failure is element-not-found/locator related, force
+     * AUTOMATION_ISSUE instead of APPLICATION_ISSUE.
+     */
+    private void enforceClassificationConsistency(InvestigationRequest request, InvestigationResponse response) {
+        if (response == null) {
+            return;
+        }
+
+        String classification = upper(response.getClassification());
+        if (!"APPLICATION_ISSUE".equals(classification)) {
+            return;
+        }
+
+        String locatorSignals = join(
+                request == null ? null : request.getError(),
+                request == null ? null : request.getFailedStep(),
+                response.getRootCause(),
+                response.getRecommendedAction(),
+                response.getSuggestedFix(),
+                response.getSimilarPatterns(),
+                response.getScreenshotObservation(),
+                joinList(response.getEvidence())
+        );
+
+        if (containsAny(locatorSignals,
+                "nosuchelementexception",
+                "unable to locate",
+                "cannot find element",
+                "element not found",
+                "failed to find element",
+                "locator",
+                "selector",
+                "resource-id",
+                "accessibility id",
+                "accessibility-id",
+                "xpath",
+                "css selector")) {
+
+            boolean elementVisible = containsAny(locatorSignals,
+                    "element is visible",
+                    "visually present",
+                    "button is visible",
+                    "present and correctly",
+                    "ui readiness",
+                    "screen is ready",
+                    "no error dialogs",
+                    "visible",
+                    "enabled");
+
+            boolean connectivityFailure = containsAny(locatorSignals,
+                    "err_connection_refused",
+                    "site can't be reached",
+                    "refused to connect",
+                    "err_name_not_resolved",
+                    "err_connection_timed_out",
+                    "dns",
+                    "502",
+                    "503",
+                    "504",
+                    "gateway");
+
+            if (elementVisible && !connectivityFailure) {
+                response.setClassification("AUTOMATION_ISSUE");
+            }
+        }
+    }
+
+    private String joinList(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return "";
+        }
+        return String.join("\n", values);
+    }
+
+    private String join(String... values) {
+        StringBuilder sb = new StringBuilder();
+        for (String value : values) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            if (!sb.isEmpty()) {
+                sb.append('\n');
+            }
+            sb.append(value);
+        }
+        return sb.toString();
+    }
+
+    private boolean containsAny(String text, String... needles) {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+        String haystack = text.toLowerCase();
+        for (String needle : needles) {
+            if (needle != null && !needle.isBlank() && haystack.contains(needle.toLowerCase())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String upper(String value) {
+        return value == null ? "" : value.trim().toUpperCase();
     }
 
     private String extractJson(String response) {

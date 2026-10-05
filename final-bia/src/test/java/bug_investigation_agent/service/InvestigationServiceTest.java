@@ -109,6 +109,44 @@ class InvestigationServiceTest {
         verifyNoInteractions(promptBuilder);
     }
 
+        @Test
+        void historicalApplicationIssueWithVisibleElementLocatorSignals_isCorrectedToAutomationIssue() {
+                InvestigationRequest request = request();
+                String failureId = FailureIdGenerator.generate(
+                                request.getScenario(), request.getFeature(), request.getFailedStep(), request.getError());
+
+                FailureFeedback historical = new FailureFeedback();
+                historical.setFailureId(failureId);
+                historical.setAiClassification("APPLICATION_ISSUE");
+                historical.setHumanClassification(null);
+                historical.setRootCause("The button is visually present but locator cannot find the element");
+                historical.setRootCauseType("CONFIRMED");
+                historical.setConfidence(90);
+                historical.setSeverity("MEDIUM");
+                historical.setRecommendedAction("Update locator in page object");
+                historical.setSuggestedFix("Use correct accessibility id/resource-id");
+                historical.setSimilarPatterns("Locator mismatch while element is visible");
+                historical.setScreenshotObservation("Checkout screen ready and Place demo order button is visible");
+                historical.setEvidenceJson("[\"element is visible\",\"unable to locate element\"]");
+                historical.setMissingEvidenceJson("[]");
+                historical.setPreventionTipsJson("[]");
+                historical.setStepsToReproduceJson("[]");
+                historical.setSource(FailureFeedbackService.SOURCE_AI);
+
+                when(failureFeedbackService.getFeedbackByFailureId(failureId)).thenReturn(Optional.of(historical));
+                when(failureFeedbackService.isAnalysisComplete(historical)).thenReturn(true);
+
+                InvestigationService.InvestigationOutcome outcome =
+                                investigationService.investigateWithMetrics(request, "verify checkout flow");
+
+                assertThat(outcome.response().getClassification()).isEqualTo("AUTOMATION_ISSUE");
+                assertThat(outcome.response().getSource()).isEqualTo(FailureFeedbackService.SOURCE_HISTORICAL);
+                assertThat(outcome.callMetrics()).isEmpty();
+
+                verifyNoInteractions(ollamaClient);
+                verifyNoInteractions(promptBuilder);
+        }
+
     @Test
     void noHistoricalClassification_fallsThroughToOllama() {
         InvestigationRequest request = request();
@@ -133,6 +171,34 @@ class InvestigationServiceTest {
         assertThat(outcome.response().getClassification()).isEqualTo("AUTOMATION_ISSUE");
         assertThat(outcome.response().getSource()).isEqualTo(FailureFeedbackService.SOURCE_AI);
         assertThat(outcome.callMetrics()).hasSize(1);
+    }
+
+    @Test
+    void visibleElementAndLocatorFailure_overridesApplicationToAutomationIssue() {
+        InvestigationRequest request = request();
+        request.setError("NoSuchElementException: unable to locate element for legacy locator");
+
+        when(failureFeedbackService.getFeedbackByFailureId(anyString())).thenReturn(Optional.empty());
+        when(promptBuilder.buildPrompt(any(InvestigationRequest.class), nullable(String.class))).thenReturn("prompt text");
+        when(failureFeedbackService.getClassification(anyString())).thenReturn(Optional.empty());
+
+        String json = "{"
+                + "\"classification\":\"APPLICATION_ISSUE\"," 
+                + "\"rootCause\":\"Button is visually present but legacy locator cannot find it\"," 
+                + "\"confidence\":90,"
+                + "\"severity\":\"MEDIUM\"," 
+                + "\"rootCauseType\":\"CONFIRMED\"," 
+                + "\"screenshotObservation\":\"Checkout screen is ready and Place demo order button is visible\"," 
+                + "\"evidence\":[\"element is visible\",\"unable to locate element\"]"
+                + "}";
+        when(ollamaClient.generateWithMetrics(anyString(), any()))
+                .thenReturn(new OllamaClient.OllamaGenerationResult(json, "qwen2.5:7b", true, 10L, 100, 50));
+
+        InvestigationService.InvestigationOutcome outcome =
+                investigationService.investigateWithMetrics(request, "verify checkout flow");
+
+        assertThat(outcome.response().getClassification()).isEqualTo("AUTOMATION_ISSUE");
+        assertThat(outcome.response().getSource()).isEqualTo(FailureFeedbackService.SOURCE_AI);
     }
 
         @Test
