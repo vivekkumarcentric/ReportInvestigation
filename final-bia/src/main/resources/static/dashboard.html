@@ -1795,7 +1795,7 @@
                     }
                     const failedNode = failedIndex >= 0 ? orderedSteps[failedIndex] : null;
                     const failedSearchIndex = failedNode ? scenarioSteps.indexOf(failedNode) : -1;
-                    const screenshot = findScreenshotInScenario(scenarioSteps, failedSearchIndex);
+                    const screenshot = findScreenshotInScenario(scenario, failedSearchIndex);
                     const videoUrl = findVideoInScenario(scenarioSteps, failedSearchIndex);
                     const testCase = {
                         name: scenarioName,
@@ -1864,32 +1864,60 @@
         // Extracts a base64/path screenshot from a single step node, checking both
         // step.media (array, used by some steps) and each log entry's media (object,
         // commonly used by ExtentReports for hook-level attachments like afterScenario).
-        function extractScreenshotFromStepNode(step) {
-            if (!step) return null;
-            if (Array.isArray(step.media) && step.media.length > 0) {
-                const found = step.media.find(m => m && (m.base64 || m.path));
-                if (found) return found.base64 || found.path;
+        function extractScreenshotFromNode(node) {
+            if (!node || typeof node !== 'object') return null;
+
+            const directScreenshot = node.screenshot || node.image || node.failureImage || node.failure_image || node.screenshotBase64 || node.base64 || null;
+            if (directScreenshot) return directScreenshot;
+
+            if (Array.isArray(node.media) && node.media.length > 0) {
+                const found = node.media.find(m => m && (m.base64 || m.path || m.url || m.src));
+                if (found) return found.base64 || found.path || found.url || found.src;
             }
-            if (Array.isArray(step.logs)) {
-                for (const log of step.logs) {
+
+            if (Array.isArray(node.logs)) {
+                for (const log of node.logs) {
                     const media = log && log.media;
                     if (!media) continue;
                     if (Array.isArray(media)) {
-                        const found = media.find(m => m && (m.base64 || m.path));
-                        if (found) return found.base64 || found.path;
-                    } else if (media.base64 || media.path) {
-                        return media.base64 || media.path;
+                        const found = media.find(m => m && (m.base64 || m.path || m.url || m.src));
+                        if (found) return found.base64 || found.path || found.url || found.src;
+                    } else if (media.base64 || media.path || media.url || media.src) {
+                        return media.base64 || media.path || media.url || media.src;
                     }
                 }
             }
+
+            if (Array.isArray(node.children) && node.children.length > 0) {
+                for (const child of node.children) {
+                    const nested = extractScreenshotFromNode(child);
+                    if (nested) return nested;
+                }
+            }
+
             return null;
+        }
+
+        function extractScreenshotFromStepNode(step) {
+            return extractScreenshotFromNode(step);
         }
 
         // Searches the whole scenario for a screenshot, preferring the failed step itself,
         // then any step AFTER it (e.g. the afterScenario hook, where ExtentReports typically
         // attaches the failure screenshot), then finally any step in the scenario.
-        function findScreenshotInScenario(steps, failedIndex) {
-            if (!Array.isArray(steps) || steps.length === 0) return null;
+        function findScreenshotInScenario(target, failedIndex) {
+            if (!target) return null;
+
+            if (typeof target === 'object' && !Array.isArray(target)) {
+                const direct = extractScreenshotFromNode(target);
+                if (direct) return direct;
+                const children = Array.isArray(target.children) ? target.children : [];
+                if (children.length > 0) return findScreenshotInScenario(children, failedIndex);
+                return null;
+            }
+
+            if (!Array.isArray(target) || target.length === 0) return null;
+            const steps = target;
 
             // Expand recursively so nested Extent nodes are searchable here even when callers
             // provide wrapper-level children.
@@ -1979,7 +2007,7 @@
 
             const failedStep = item.failedStep || item.failed_step || item.failedStepLine || item.step || item.failingStep || item.failure_step || (status === 'fail' ? 'Step information not available' : null);
             const error = item.error || item.errorMessage || item.error_message || item.message || item.failure || item.failureMessage || item.stackTrace || item.stack_trace || item.trace || (status === 'fail' ? 'Error details not available' : null);
-            const screenshot = item.screenshot || item.image || item.failureImage || item.failure_image || item.screenshotBase64 || null;
+            const screenshot = extractScreenshotFromNode(item);
             const videoUrl = item.videoUrl || item.video || '';
             const testCaseId = item.testCaseID || item.test_case_id || item.id || item.testId || '';
             const feature = item.feature || item.featureName || item.suite || item.category || '';
